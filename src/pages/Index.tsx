@@ -11,6 +11,9 @@ import SolutionsSection from "@/components/sections/SolutionsSection";
 import TestimonialsSection from "@/components/sections/TestimonialsSection";
 import CTASection from "@/components/sections/CTASection";
 import HeroSection from "@/components/sections/HeroSection";
+import SmartAssistant from "@/components/SmartAssistant";
+import SmartRecommendations from "@/components/SmartRecommendations";
+import SmartInsights from "@/components/SmartInsights";
 
 const Index = () => {
   useEffect(() => {
@@ -27,6 +30,12 @@ const Index = () => {
     // Observe all sections with fade-in-section class
     document.querySelectorAll('.fade-in-section').forEach(section => {
       observer.observe(section);
+    });
+
+    // Log page visit for analytics purposes
+    console.log("Home page viewed", {
+      timestamp: new Date().toISOString(),
+      path: window.location.pathname
     });
 
     return () => observer.disconnect();
@@ -48,6 +57,9 @@ const Index = () => {
       
       <WhyChooseUsSection />
       
+      {/* Smart Recommendations Section */}
+      <SmartRecommendations />
+      
       <ServicesSection />
       
       <SolutionsSection />
@@ -57,6 +69,10 @@ const Index = () => {
       <CTASection />
       
       <Footer />
+      
+      {/* Smart Website Components */}
+      <SmartAssistant />
+      <SmartInsights />
     </div>
   );
 };

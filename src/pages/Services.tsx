@@ -1,5 +1,6 @@
 
 import React from "react";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SectionTitle from "@/components/SectionTitle";
@@ -7,9 +8,55 @@ import FeatureCard from "@/components/FeatureCard";
 import CTAButton from "@/components/CTAButton";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Card, CardContent } from "@/components/ui/card";
-import { Code, Settings, Users, Zap, Shield, Cpu, Network, Database, LayoutList } from "lucide-react";
+import { Code, Settings, Users, Zap, Shield, Cpu, Network, Database, LayoutList, ArrowRight } from "lucide-react";
 
 const Services = () => {
+  // Define services with slugs
+  const services = [
+    {
+      id: 1,
+      title: "AI Implementation",
+      description: "Integrate AI/ML solutions to improve decision-making and efficiency across your organization.",
+      icon: <Cpu size={48} className="text-xtech-purple" />,
+      slug: "ai-implementation"
+    },
+    {
+      id: 2,
+      title: "Project Optimization",
+      description: "Analyze and streamline processes to deliver projects faster and on budget with less resource waste.",
+      icon: <Settings size={48} className="text-xtech-blue" />,
+      slug: "project-optimization"
+    },
+    {
+      id: 3,
+      title: "Digital Transformation",
+      description: "Comprehensive strategies to modernize your business operations and drive innovation.",
+      icon: <Zap size={48} className="text-xtech-purple" />,
+      slug: "digital-transformation"
+    },
+    {
+      id: 4,
+      title: "Cloud Solutions",
+      description: "Secure and scalable cloud infrastructure tailored to your business requirements.",
+      icon: <Network size={48} className="text-xtech-blue" />,
+      slug: "cloud-solutions"
+    },
+    {
+      id: 5,
+      title: "Cyber Security",
+      description: "Advanced threat protection and security policy implementation to keep your data safe.",
+      icon: <Shield size={48} className="text-xtech-purple" />,
+      slug: "cyber-security"
+    },
+    {
+      id: 6,
+      title: "IT Management",
+      description: "End-to-end management of your IT infrastructure and projects with dedicated resources.",
+      icon: <LayoutList size={48} className="text-xtech-blue" />,
+      slug: "it-management"
+    },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -28,8 +75,36 @@ const Services = () => {
         </div>
       </section>
       
+      {/* Main Services Grid */}
+      <section className="py-12 relative">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl font-bold mb-6 gradient-text">Our Core Services</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {services.map((service) => (
+              <Link 
+                key={service.id} 
+                to={`/services/${service.slug}`}
+                className="group"
+              >
+                <div className="bg-xtech-dark-purple/60 border border-white/5 rounded-lg p-6 h-full flex flex-col hover:border-xtech-purple/40 hover:shadow-lg hover:shadow-xtech-purple/10 transition-all duration-300 hover:-translate-y-1">
+                  <div className="mb-4">
+                    {service.icon}
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">{service.title}</h3>
+                  <p className="text-xtech-light-gray mb-6 flex-grow">{service.description}</p>
+                  <div className="flex items-center text-xtech-blue font-medium group-hover:text-xtech-purple transition-colors">
+                    Learn More <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+      
       {/* High-Value Consultancy */}
       <section className="py-8 relative">
+        <div className="absolute -z-10 top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-xtech-blue/20 blur-[150px] opacity-30"></div>
         <div className="container mx-auto px-4">
           <h2 className="text-2xl font-bold mb-6 gradient-text">High-Value Consultancy</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -250,22 +325,16 @@ const Services = () => {
       {/* CTA Section */}
       <section className="py-16 bg-gradient-to-br from-xtech-dark-purple to-xtech-dark">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-6">Interested in a Tailored Solution?</h2>
+          <h2 className="text-3xl font-bold mb-6">Ready for IT Solutions That Drive Growth?</h2>
           <p className="text-xtech-light-gray max-w-xl mx-auto mb-8">
             Our experts are ready to discuss your needs and develop a solution tailored to your business requirements.
           </p>
-          <CTAButton to="/contact" className="mx-auto">Schedule a Consultation</CTAButton>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <CTAButton to="/contact?tab=booking" className="mx-auto">Schedule a Consultation</CTAButton>
+            <CTAButton to="/contact" variant="secondary" className="mx-auto">Contact Us</CTAButton>
+          </div>
         </div>
       </section>
-      
-      {/* Floating Help Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button className="h-14 w-14 bg-gradient-to-r from-xtech-purple to-xtech-blue rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </button>
-      </div>
       
       <Footer />
     </div>

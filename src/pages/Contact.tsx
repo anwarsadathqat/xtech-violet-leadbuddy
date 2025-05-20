@@ -4,7 +4,9 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SectionTitle from "@/components/SectionTitle";
 import ContactForm from "@/components/ContactForm";
-import { Phone, Mail, MapPin } from "lucide-react";
+import BookingCalendar from "@/components/BookingCalendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Phone, Mail, MapPin, Calendar, MessageSquare } from "lucide-react";
 
 const Contact = () => {
   return (
@@ -27,7 +29,7 @@ const Contact = () => {
       {/* Contact Information */}
       <section className="py-8">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-4 gap-4 max-w-4xl mx-auto">
             <div className="bg-xtech-dark-purple p-6 rounded-lg flex flex-col items-center text-center">
               <Phone size={32} className="text-xtech-blue mb-4" />
               <h3 className="text-xl font-bold mb-2">Phone</h3>
@@ -37,8 +39,8 @@ const Contact = () => {
             <div className="bg-xtech-dark-purple p-6 rounded-lg flex flex-col items-center text-center">
               <Mail size={32} className="text-xtech-blue mb-4" />
               <h3 className="text-xl font-bold mb-2">Email</h3>
-              <a href="mailto:info@xtech.qa" className="text-xtech-light-gray hover:text-xtech-blue">
-                info@xtech.qa XtechInfoQat@gmail.com
+              <a href="mailto:XtechInfoQat@gmail.com" className="text-xtech-light-gray hover:text-xtech-blue">
+                XtechInfoQat@gmail.com
               </a>
             </div>
             
@@ -47,35 +49,67 @@ const Contact = () => {
               <h3 className="text-xl font-bold mb-2">Address</h3>
               <p className="text-xtech-light-gray">XTech HQ, Doha, Qatar</p>
             </div>
+
+            <div className="bg-xtech-dark-purple p-6 rounded-lg flex flex-col items-center text-center">
+              <Calendar size={32} className="text-xtech-blue mb-4" />
+              <h3 className="text-xl font-bold mb-2">Hours</h3>
+              <p className="text-xtech-light-gray">Sun-Thu: 9am-6pm</p>
+            </div>
           </div>
         </div>
       </section>
       
-      {/* Contact Form and Map */}
-      <section className="py-16">
+      {/* Contact Form and Booking Calendar Tabs */}
+      <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-12">
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Send Us a Message</h2>
-              <ContactForm />
-            </div>
+          <Tabs defaultValue="message" className="max-w-4xl mx-auto">
+            <TabsList className="grid grid-cols-2 mb-8">
+              <TabsTrigger value="message" className="flex items-center gap-2 text-lg py-3">
+                <MessageSquare size={18} />
+                Send Message
+              </TabsTrigger>
+              <TabsTrigger value="booking" className="flex items-center gap-2 text-lg py-3">
+                <Calendar size={18} />
+                Schedule Consultation
+              </TabsTrigger>
+            </TabsList>
             
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Our Location</h2>
-              <div className="rounded-lg overflow-hidden h-[400px]">
-                <iframe
-                  src="https://maps.google.com/maps?q=Doha,+Qatar&z=13&output=embed"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title="XTech Office Location"
-                ></iframe>
+            <TabsContent value="message">
+              <div className="grid md:grid-cols-2 gap-12">
+                <div>
+                  <h2 className="text-2xl font-bold mb-6">Send Us a Message</h2>
+                  <ContactForm />
+                </div>
+                
+                <div>
+                  <h2 className="text-2xl font-bold mb-6">Our Location</h2>
+                  <div className="rounded-lg overflow-hidden h-[400px]">
+                    <iframe
+                      src="https://maps.google.com/maps?q=Doha,+Qatar&z=13&output=embed"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      allowFullScreen
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      title="XTech Office Location"
+                    ></iframe>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </TabsContent>
+            
+            <TabsContent value="booking">
+              <div className="mb-8 text-center">
+                <h2 className="text-2xl font-bold mb-3">Schedule a Consultation</h2>
+                <p className="text-xtech-light-gray max-w-2xl mx-auto">
+                  Choose a convenient date and time for your consultation with our IT experts. 
+                  We'll discuss your needs and provide tailored solutions for your business.
+                </p>
+              </div>
+              <BookingCalendar />
+            </TabsContent>
+          </Tabs>
         </div>
       </section>
       
@@ -87,13 +121,6 @@ const Contact = () => {
           <p className="text-xtech-light-gray">Saturday: 10:00 AM - 2:00 PM</p>
         </div>
       </section>
-      
-      {/* Chatbot Widget (Placeholder) */}
-      <div className="fixed bottom-6 right-6 h-14 w-14 bg-gradient-to-r from-xtech-purple to-xtech-blue rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
       
       <Footer />
     </div>

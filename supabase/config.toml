@@ -1,1 +1,5 @@
+
 project_id = "zuajpsrnynudfgmqiqch"
+
+[functions.store-lead]
+verify_jwt = false

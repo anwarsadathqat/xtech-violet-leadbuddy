@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Lightning, Star } from "lucide-react";
+import { Zap, Star } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 const SmartInsights: React.FC = () => {
@@ -41,7 +41,7 @@ const SmartInsights: React.FC = () => {
     >
       <div className="flex items-start mb-3">
         <div className="p-2 rounded-full bg-xtech-purple/20 mr-3">
-          <Lightning size={16} className="text-xtech-purple" />
+          <Zap size={16} className="text-xtech-purple" />
         </div>
         <div>
           <h4 className="text-sm font-medium mb-1">Quick Question</h4>

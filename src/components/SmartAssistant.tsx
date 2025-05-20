@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bot, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 
 interface Message {
@@ -48,6 +48,14 @@ const predefinedResponses: Record<string, string[]> = {
   "consultation": [
     "We'd be happy to schedule a free consultation with one of our experts. Please provide your contact information and preferred time, and we'll reach out to you.",
     "Our consultations are personalized to understand your specific challenges. Would you like to speak with a specialist in AI, cloud, or digital transformation?"
+  ],
+  "yes": [
+    "Great! What specific topic or service would you like our expert to help you with? We have specialists in AI implementation, cloud solutions, and digital transformation.",
+    "Excellent! Please let me know which area you need assistance with, and I'll connect you with the right specialist. You can also provide your contact details for a follow-up."
+  ],
+  "no": [
+    "No problem! If you have any other questions I can help with, please feel free to ask.",
+    "That's fine. Is there anything else I can assist you with today?"
   ]
 };
 
@@ -55,6 +63,7 @@ const SmartAssistant: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
+  const [expertRequested, setExpertRequested] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -76,9 +85,18 @@ const SmartAssistant: React.FC = () => {
   const findResponse = (query: string): string => {
     const lowercaseQuery = query.toLowerCase();
     
+    // Handle the case when a user responds "yes" after being asked about an expert
+    if (expertRequested && (lowercaseQuery === "yes" || lowercaseQuery === "y")) {
+      return "Great! To connect you with the right expert, could you please let me know which specific service you're interested in (AI Implementation, Cloud Solutions, or Digital Transformation)? Or you can provide your email for a follow-up.";
+    }
+    
     // Check each keyword for a match
     for (const [keyword, responses] of Object.entries(predefinedResponses)) {
       if (lowercaseQuery.includes(keyword)) {
+        // For default response, mark that we've asked about connecting to an expert
+        if (lowercaseQuery === "yes" || lowercaseQuery === "y") {
+          setExpertRequested(true);
+        }
         // Randomly select one of the available responses for variety
         return responses[Math.floor(Math.random() * responses.length)];
       }
@@ -98,6 +116,7 @@ const SmartAssistant: React.FC = () => {
     }
     
     // Default response with an offer to connect with an expert
+    setExpertRequested(true); // Set flag when we use this default response
     return "I don't have specific information about that. Would you like to speak with one of our experts who can provide more detailed assistance?";
   };
 

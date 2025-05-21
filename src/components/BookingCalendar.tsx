@@ -26,6 +26,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
   const [notes, setNotes] = useState("");
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const { toast } = useToast();
 
   const handleNextStep = () => {
@@ -79,6 +81,37 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
     setCurrentStep(currentStep - 1);
   };
 
+  const sendConfirmationEmail = async (bookingData: {
+    name: string;
+    email: string;
+    date: string;
+    timeSlot: string;
+    service: string;
+    phone: string;
+    notes?: string;
+  }) => {
+    setIsSendingEmail(true);
+    try {
+      // Call the Supabase edge function to send the confirmation email
+      const { data, error } = await supabase.functions.invoke("send-confirmation", {
+        body: bookingData,
+      });
+
+      if (error) {
+        console.error("Error sending confirmation email:", error);
+        return false;
+      }
+
+      console.log("Email confirmation response:", data);
+      return true;
+    } catch (err) {
+      console.error("Failed to send confirmation email:", err);
+      return false;
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -114,6 +147,19 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
           // Continue anyway to show success to user
         } else {
           console.log("Booking saved successfully:", data);
+          
+          // Send confirmation email
+          const emailSent = await sendConfirmationEmail({
+            name,
+            email,
+            date: formattedDate,
+            timeSlot: timeSlot || '',
+            service: serviceName || 'Consultation',
+            phone,
+            notes
+          });
+          
+          setEmailSent(emailSent);
         }
       } catch (err) {
         console.error("Supabase error:", err);
@@ -324,10 +370,22 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
               <span>{email}</span>
             </div>
           </div>
-          <p className="text-sm text-white/70 mb-4">
-            A confirmation email has been sent to your email address. 
-            Our team will reach out to confirm your appointment.
+          <p className="text-sm text-white/70 mb-1">
+            {emailSent ? (
+              "A confirmation email has been sent to your email address."
+            ) : (
+              isSendingEmail ? (
+                "Sending confirmation email..."
+              ) : (
+                "Our team will reach out to confirm your appointment."
+              )
+            )}
           </p>
+          {!emailSent && !isSendingEmail && (
+            <p className="text-xs text-white/50 mb-4">
+              Note: We couldn't send a confirmation email at this time.
+            </p>
+          )}
           <Button
             onClick={() => {
               // Reset form
@@ -337,6 +395,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
               setEmail("");
               setPhone("");
               setNotes("");
+              setEmailSent(false);
               setCurrentStep(1);
             }}
             className="bg-xtech-blue hover:bg-xtech-blue/80 text-white"

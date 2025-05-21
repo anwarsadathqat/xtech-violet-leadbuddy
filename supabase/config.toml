@@ -1,5 +1,8 @@
 
 project_id = "zuajpsrnynudfgmqiqch"
 
+[functions.send-confirmation]
+verify_jwt = false
+
 [functions.store-lead]
 verify_jwt = false

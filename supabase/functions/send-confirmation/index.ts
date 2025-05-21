@@ -31,7 +31,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Create a nicely formatted email with booking information
     const emailResponse = await resend.emails.send({
-      from: "XTech Consulting <XtechInfoQat@gmail.com>",
+      from: "XTech Consulting <onboarding@resend.dev>",
       to: [email],
       subject: `Your ${service} Consultation is Confirmed`,
       html: `

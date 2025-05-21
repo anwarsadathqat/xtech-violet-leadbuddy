@@ -57,7 +57,7 @@ const handler = async (req: Request): Promise<Response> => {
               ${notes ? `<li>Notes: ${notes}</li>` : ''}
             </ul>
             
-            <p>If you need to reschedule or have any questions, please contact our support team.</p>
+            <p>If you need to reschedule or have any questions, please contact our support team at support@xtech-consulting.com.</p>
             
             <p>We look forward to speaking with you!</p>
             

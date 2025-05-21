@@ -164,11 +164,26 @@ const ServicePage: React.FC = () => {
           return defaultServices[slug as string] || null;
         }
         
-        // Ensure faqs is an array
+        // Ensure faqs is an array of properly formatted FAQItem objects
         const processedData: Service = {
           ...data,
-          // Convert faqs from JSON to array if needed
-          faqs: Array.isArray(data.faqs) ? data.faqs : []
+          // Convert faqs from JSON to array of FAQItem objects
+          faqs: Array.isArray(data.faqs) 
+            ? data.faqs.map((faq: any) => {
+                // Ensure each FAQ has question and answer properties
+                if (typeof faq === 'object' && faq !== null) {
+                  return {
+                    question: faq.question || 'Question not available',
+                    answer: faq.answer || 'Answer not available'
+                  };
+                }
+                // Handle case where faq is not an object
+                return {
+                  question: 'Invalid FAQ format',
+                  answer: 'This FAQ could not be displayed properly'
+                };
+              })
+            : []
         };
         
         return processedData;
@@ -221,7 +236,7 @@ const ServicePage: React.FC = () => {
   }
   
   // Ensure faqs is always an array
-  const serviceFaqs: FAQItem[] = Array.isArray(service.faqs) ? service.faqs : [];
+  const serviceFaqs: FAQItem[] = Array.isArray(service?.faqs) ? service.faqs : [];
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,8 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+import { google } from "npm:googleapis@126.0.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +18,42 @@ interface BookingConfirmationRequest {
   notes?: string;
 }
 
+// Configure Gmail API
+const setupGmailClient = () => {
+  const CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
+  const CLIENT_SECRET = Deno.env.get("GMAIL_CLIENT_SECRET");
+  const REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
+  
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
+    throw new Error("Gmail API credentials are not configured properly");
+  }
+
+  const oauth2Client = new google.auth.OAuth2(
+    CLIENT_ID,
+    CLIENT_SECRET,
+    "https://developers.google.com/oauthplayground"
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: REFRESH_TOKEN
+  });
+
+  return google.gmail({ version: 'v1', auth: oauth2Client });
+};
+
+// Create email content in base64 encoded format
+const createEmail = (to: string, subject: string, html: string): string => {
+  const emailLines = [
+    `To: ${to}`,
+    'Content-Type: text/html; charset=utf-8',
+    `Subject: ${subject}`,
+    '',
+    html
+  ];
+  
+  return btoa(emailLines.join('\r\n').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''));
+};
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -28,60 +62,91 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { name, email, date, timeSlot, service, phone, notes }: BookingConfirmationRequest = await req.json();
-
-    // Create a nicely formatted email with booking information
-    const emailResponse = await resend.emails.send({
-      from: "XTech Consulting <onboarding@resend.dev>",
-      to: [email],
-      subject: `Your ${service} Consultation is Confirmed`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-          <div style="background-color: #6c22d8; padding: 20px; text-align: center; color: white;">
-            <h1 style="margin: 0;">Booking Confirmation</h1>
-          </div>
-          
-          <div style="padding: 20px; border: 1px solid #ddd; border-top: none;">
-            <p>Hello ${name},</p>
-            <p>Thank you for scheduling a consultation with XTech Consulting. Your appointment has been confirmed:</p>
-            
-            <div style="background-color: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px;">
-              <p><strong>Service:</strong> ${service}</p>
-              <p><strong>Date:</strong> ${date}</p>
-              <p><strong>Time:</strong> ${timeSlot}</p>
-            </div>
-            
-            <p>We've saved your contact information:</p>
-            <ul>
-              <li>Email: ${email}</li>
-              <li>Phone: ${phone}</li>
-              ${notes ? `<li>Notes: ${notes}</li>` : ''}
-            </ul>
-            
-            <p>If you need to reschedule or have any questions, please contact our support team at support@xtech-consulting.com.</p>
-            
-            <p>We look forward to speaking with you!</p>
-            
-            <p>Best regards,<br>XTech Consulting Team</p>
-          </div>
-          
-          <div style="text-align: center; padding-top: 20px; color: #777; font-size: 12px;">
-            <p>© ${new Date().getFullYear()} XTech Consulting. All rights reserved.</p>
-          </div>
+    
+    // Format email content
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+        <div style="background-color: #6c22d8; padding: 20px; text-align: center; color: white;">
+          <h1 style="margin: 0;">Booking Confirmation</h1>
         </div>
-      `,
-    });
-
-    console.log("Email confirmation sent successfully:", emailResponse);
-
-    return new Response(JSON.stringify({ success: true, data: emailResponse }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    });
+        
+        <div style="padding: 20px; border: 1px solid #ddd; border-top: none;">
+          <p>Hello ${name},</p>
+          <p>Thank you for scheduling a consultation with XTech Consulting. Your appointment has been confirmed:</p>
+          
+          <div style="background-color: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px;">
+            <p><strong>Service:</strong> ${service}</p>
+            <p><strong>Date:</strong> ${date}</p>
+            <p><strong>Time:</strong> ${timeSlot}</p>
+          </div>
+          
+          <p>We've saved your contact information:</p>
+          <ul>
+            <li>Email: ${email}</li>
+            <li>Phone: ${phone}</li>
+            ${notes ? `<li>Notes: ${notes}</li>` : ''}
+          </ul>
+          
+          <p>If you need to reschedule or have any questions, please contact our support team at XtechInfoQat@gmail.com.</p>
+          
+          <p>We look forward to speaking with you!</p>
+          
+          <p>Best regards,<br>XTech Consulting Team</p>
+        </div>
+        
+        <div style="text-align: center; padding-top: 20px; color: #777; font-size: 12px;">
+          <p>© ${new Date().getFullYear()} XTech Consulting. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+    
+    try {
+      // Set up Gmail client
+      const gmail = setupGmailClient();
+      
+      // Create the email content
+      const rawEmail = createEmail(
+        email, 
+        `Your ${service} Consultation is Confirmed`, 
+        html
+      );
+      
+      // Send email via Gmail API
+      const response = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw: rawEmail
+        }
+      });
+      
+      console.log("Email confirmation sent successfully:", response.data);
+      
+      return new Response(JSON.stringify({ success: true, data: response.data }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      });
+    } catch (emailError: any) {
+      console.error("Error sending email:", emailError);
+      
+      // Return a success response to the client even if email fails
+      // This way the booking is still confirmed in the system
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          emailSent: false,
+          message: "Booking confirmed but email could not be sent. Please contact support."
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
   } catch (error: any) {
-    console.error("Error sending booking confirmation email:", error);
+    console.error("Error in booking confirmation function:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       {

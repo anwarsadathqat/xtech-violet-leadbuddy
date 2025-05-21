@@ -9,53 +9,129 @@ import CTAButton from "@/components/CTAButton";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Card, CardContent } from "@/components/ui/card";
 import { Code, Settings, Users, Zap, Shield, Cpu, Network, Database, LayoutList, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Service type definition
+interface Service {
+  id: string;
+  title: string;
+  name: string;
+  description: string;
+  slug: string;
+  icon: React.ReactNode;
+}
+
+// Get icon component based on icon name string
+const getIconComponent = (iconName: string, size: number = 48, className: string = "text-xtech-purple") => {
+  switch (iconName?.toLowerCase()) {
+    case 'cpu':
+      return <Cpu size={size} className={className} />;
+    case 'settings':
+      return <Settings size={size} className={className} />;
+    case 'zap':
+      return <Zap size={size} className={className} />;
+    case 'network':
+    case 'cloud':
+      return <Network size={size} className={className} />;
+    case 'shield':
+      return <Shield size={size} className={className} />;
+    case 'layoutlist':
+      return <LayoutList size={size} className={className} />;
+    case 'users':
+      return <Users size={size} className={className} />;
+    case 'code':
+      return <Code size={size} className={className} />;
+    case 'database':
+      return <Database size={size} className={className} />;
+    default:
+      return <Zap size={size} className={className} />;
+  }
+};
 
 const Services = () => {
-  // Define services with slugs
-  const services = [
+  // Fetch services from Supabase
+  const { data: services, isLoading, error } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('services')
+          .select('id, name, description, slug, icon')
+          .order('name', { ascending: true });
+          
+        if (error || !data) {
+          console.error("Error fetching services:", error);
+          return [];
+        }
+        
+        // Map database services to UI format with icons
+        return data.map(service => ({
+          id: service.id,
+          title: service.name,
+          name: service.name,
+          description: service.description,
+          slug: service.slug,
+          icon: getIconComponent(service.icon || '', 48, service.icon ? 
+            (service.icon.toLowerCase().includes('purple') ? "text-xtech-purple" : "text-xtech-blue") : 
+            "text-xtech-purple")
+        }));
+      } catch (err) {
+        console.error("Error in services query:", err);
+        return [];
+      }
+    }
+  });
+
+  // Default services to display if database fetch fails
+  const defaultServices = [
     {
-      id: 1,
+      id: '1',
       title: "AI Implementation",
       description: "Integrate AI/ML solutions to improve decision-making and efficiency across your organization.",
       icon: <Cpu size={48} className="text-xtech-purple" />,
       slug: "ai-implementation"
     },
     {
-      id: 2,
+      id: '2',
       title: "Project Optimization",
       description: "Analyze and streamline processes to deliver projects faster and on budget with less resource waste.",
       icon: <Settings size={48} className="text-xtech-blue" />,
       slug: "project-optimization"
     },
     {
-      id: 3,
+      id: '3',
       title: "Digital Transformation",
       description: "Comprehensive strategies to modernize your business operations and drive innovation.",
       icon: <Zap size={48} className="text-xtech-purple" />,
       slug: "digital-transformation"
     },
     {
-      id: 4,
+      id: '4',
       title: "Cloud Solutions",
       description: "Secure and scalable cloud infrastructure tailored to your business requirements.",
       icon: <Network size={48} className="text-xtech-blue" />,
       slug: "cloud-solutions"
     },
     {
-      id: 5,
+      id: '5',
       title: "Cyber Security",
       description: "Advanced threat protection and security policy implementation to keep your data safe.",
       icon: <Shield size={48} className="text-xtech-purple" />,
       slug: "cyber-security"
     },
     {
-      id: 6,
+      id: '6',
       title: "IT Management",
       description: "End-to-end management of your IT infrastructure and projects with dedicated resources.",
       icon: <LayoutList size={48} className="text-xtech-blue" />,
       slug: "it-management"
     },
   ];
+
+  // Use database services if available, otherwise use defaults
+  const displayServices = services && services.length > 0 ? services : defaultServices;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -79,26 +155,42 @@ const Services = () => {
       <section className="py-12 relative">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl font-bold mb-6 gradient-text">Our Core Services</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {services.map((service) => (
-              <Link 
-                key={service.id} 
-                to={`/services/${service.slug}`}
-                className="group"
-              >
-                <div className="bg-xtech-dark-purple/60 border border-white/5 rounded-lg p-6 h-full flex flex-col hover:border-xtech-purple/40 hover:shadow-lg hover:shadow-xtech-purple/10 transition-all duration-300 hover:-translate-y-1">
-                  <div className="mb-4">
-                    {service.icon}
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">{service.title}</h3>
-                  <p className="text-xtech-light-gray mb-6 flex-grow">{service.description}</p>
-                  <div className="flex items-center text-xtech-blue font-medium group-hover:text-xtech-purple transition-colors">
-                    Learn More <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                  </div>
+          
+          {isLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="bg-xtech-dark-purple/60 border border-white/5 rounded-lg p-6 h-full">
+                  <Skeleton className="h-12 w-12 rounded-md mb-4" />
+                  <Skeleton className="h-6 w-2/3 mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-3/4 mb-6" />
+                  <Skeleton className="h-4 w-1/3" />
                 </div>
-              </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {displayServices.map((service) => (
+                <Link 
+                  key={service.id} 
+                  to={`/services/${service.slug}`}
+                  className="group"
+                >
+                  <div className="bg-xtech-dark-purple/60 border border-white/5 rounded-lg p-6 h-full flex flex-col hover:border-xtech-purple/40 hover:shadow-lg hover:shadow-xtech-purple/10 transition-all duration-300 hover:-translate-y-1">
+                    <div className="mb-4">
+                      {service.icon}
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{service.title}</h3>
+                    <p className="text-xtech-light-gray mb-6 flex-grow">{service.description}</p>
+                    <div className="flex items-center text-xtech-blue font-medium group-hover:text-xtech-purple transition-colors">
+                      Learn More <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
       

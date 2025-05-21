@@ -102,8 +102,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
               email,
               phone,
               service: serviceName || 'Consultation',
-              booking_date: date?.toISOString(),
-              time_slot: timeSlot,
+              booking_date: date?.toISOString() || '',
+              time_slot: timeSlot || '',
               notes,
               status: 'pending'
             }

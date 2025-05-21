@@ -45,13 +45,14 @@ const setupGmailClient = () => {
 const createEmail = (to: string, subject: string, html: string): string => {
   const emailLines = [
     `To: ${to}`,
+    'From: XTech Consulting <XtechInfoQat@gmail.com>',
     'Content-Type: text/html; charset=utf-8',
     `Subject: ${subject}`,
     '',
     html
   ];
   
-  return btoa(emailLines.join('\r\n').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''));
+  return btoa(emailLines.join('\r\n'));
 };
 
 const handler = async (req: Request): Promise<Response> => {

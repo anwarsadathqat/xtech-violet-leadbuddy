@@ -9,6 +9,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, ArrowRight } from "lucide-react";
+import FAQItem from "@/components/FAQItem";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
+// FAQ item type
+interface FAQItem {
+  question: string;
+  answer: string;
+}
 
 // Service data structure
 interface Service {
@@ -18,7 +26,7 @@ interface Service {
   slug: string;
   features: string[];
   benefits: string[];
-  faqs: Array<{question: string; answer: string}>;
+  faqs: FAQItem[]; // Explicitly define faqs as an array of FAQItem objects
   icon: string;
   cta: string;
 }
@@ -156,7 +164,14 @@ const ServicePage: React.FC = () => {
           return defaultServices[slug as string] || null;
         }
         
-        return data;
+        // Ensure faqs is an array
+        const processedData: Service = {
+          ...data,
+          // Convert faqs from JSON to array if needed
+          faqs: Array.isArray(data.faqs) ? data.faqs : []
+        };
+        
+        return processedData;
       } catch (err) {
         console.error("Error fetching service:", err);
         return defaultServices[slug as string] || null;
@@ -204,6 +219,9 @@ const ServicePage: React.FC = () => {
       </div>
     );
   }
+  
+  // Ensure faqs is always an array
+  const serviceFaqs: FAQItem[] = Array.isArray(service.faqs) ? service.faqs : [];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -262,12 +280,18 @@ const ServicePage: React.FC = () => {
         <div className="container mx-auto px-4">
           <h2 className="text-2xl font-bold mb-8 text-center">Frequently Asked Questions</h2>
           <div className="max-w-3xl mx-auto space-y-6">
-            {service.faqs.map((faq, index) => (
-              <div key={index} className="bg-white/5 p-6 rounded-lg hover:bg-white/10 transition-all duration-300">
-                <h3 className="text-lg font-semibold mb-2 text-xtech-blue">{faq.question}</h3>
-                <p className="text-white/80">{faq.answer}</p>
-              </div>
-            ))}
+            <Accordion type="single" collapsible className="w-full">
+              {serviceFaqs.map((faq, index) => (
+                <AccordionItem key={index} value={`faq-${index}`}>
+                  <AccordionTrigger className="text-lg font-semibold text-xtech-blue">
+                    {faq.question}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-white/80">
+                    {faq.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         </div>
       </section>

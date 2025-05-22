@@ -41,7 +41,7 @@ const setupGmailClient = () => {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 };
 
-// Create email content in base64 encoded format
+// Create email content in base64 encoded format that's URL-safe
 const createEmail = (to: string, subject: string, html: string): string => {
   const emailLines = [
     `To: ${to}`,
@@ -52,7 +52,13 @@ const createEmail = (to: string, subject: string, html: string): string => {
     html
   ];
   
-  return btoa(emailLines.join('\r\n'));
+  // Base64 encode the email content (using URL-safe base64 encoding)
+  const rawEmail = Buffer.from(emailLines.join('\r\n')).toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  
+  return rawEmail;
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -112,6 +118,11 @@ const handler = async (req: Request): Promise<Response> => {
         html
       );
       
+      // Add more detailed logging
+      console.log("Setting up Gmail API with client ID:", 
+                  Deno.env.get("GMAIL_CLIENT_ID")?.substring(0, 8) + "...");
+      console.log("Sending email to:", email);
+      
       // Send email via Gmail API
       const response = await gmail.users.messages.send({
         userId: 'me',
@@ -131,6 +142,15 @@ const handler = async (req: Request): Promise<Response> => {
       });
     } catch (emailError: any) {
       console.error("Error sending email:", emailError);
+      
+      // Add more detailed error logging
+      if (emailError.response) {
+        console.error("API response error:", {
+          status: emailError.response.status,
+          statusText: emailError.response.statusText,
+          data: emailError.response.data
+        });
+      }
       
       // Return a success response to the client even if email fails
       // This way the booking is still confirmed in the system

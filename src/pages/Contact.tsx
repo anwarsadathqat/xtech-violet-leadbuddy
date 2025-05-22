@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SectionTitle from "@/components/SectionTitle";
@@ -7,8 +7,35 @@ import ContactForm from "@/components/ContactForm";
 import BookingCalendar from "@/components/BookingCalendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Phone, Mail, MapPin, Calendar, MessageSquare } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const Contact = () => {
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    // Get the tab parameter from the URL
+    const tab = searchParams.get("tab");
+    
+    // Check for email status
+    const emailStatus = searchParams.get("email");
+    if (emailStatus === "failed") {
+      toast({
+        title: "Email Delivery Issue",
+        description: "Your booking was confirmed, but there was an issue sending the confirmation email. Our team has been notified.",
+        variant: "destructive",
+        duration: 7000,
+      });
+    } else if (emailStatus === "success") {
+      toast({
+        title: "Booking Confirmed!",
+        description: "A confirmation email has been sent to your inbox.",
+        duration: 5000,
+      });
+    }
+  }, [searchParams, toast]);
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -62,7 +89,7 @@ const Contact = () => {
       {/* Contact Form and Booking Calendar Tabs */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <Tabs defaultValue="message" className="max-w-4xl mx-auto">
+          <Tabs defaultValue={searchParams.get("tab") || "message"} className="max-w-4xl mx-auto">
             <TabsList className="grid grid-cols-2 mb-8">
               <TabsTrigger value="message" className="flex items-center gap-2 text-lg py-3">
                 <MessageSquare size={18} />

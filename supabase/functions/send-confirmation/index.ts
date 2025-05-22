@@ -18,7 +18,7 @@ interface BookingConfirmationRequest {
   notes?: string;
 }
 
-// Configure Gmail API
+// Configure Gmail API with improved error handling
 const setupGmailClient = () => {
   const CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
   const CLIENT_SECRET = Deno.env.get("GMAIL_CLIENT_SECRET");
@@ -28,54 +28,69 @@ const setupGmailClient = () => {
     throw new Error("Gmail API credentials are not configured properly");
   }
 
-  // Log the first few characters of each credential to confirm they're loaded
-  console.log("Client ID starts with:", CLIENT_ID.substring(0, 8) + "...");
-  console.log("Client Secret starts with:", CLIENT_SECRET.substring(0, 8) + "...");
-  console.log("Refresh Token starts with:", REFRESH_TOKEN.substring(0, 8) + "...");
+  // Log the exact values to verify they're loaded correctly (be careful with secrets)
+  console.log("Client ID is loaded and has length:", CLIENT_ID.length);
+  console.log("Client Secret is loaded and has length:", CLIENT_SECRET.length);
+  console.log("Refresh Token is loaded and has length:", REFRESH_TOKEN.length);
 
-  const oauth2Client = new google.auth.OAuth2(
-    CLIENT_ID,
-    CLIENT_SECRET,
-    "https://developers.google.com/oauthplayground" // Redirect URI
-  );
+  try {
+    const oauth2Client = new google.auth.OAuth2(
+      CLIENT_ID,
+      CLIENT_SECRET,
+      "https://developers.google.com/oauthplayground" // Redirect URI
+    );
 
-  oauth2Client.setCredentials({
-    refresh_token: REFRESH_TOKEN
-  });
+    oauth2Client.setCredentials({
+      refresh_token: REFRESH_TOKEN
+    });
 
-  return google.gmail({ version: 'v1', auth: oauth2Client });
+    return google.gmail({ version: 'v1', auth: oauth2Client });
+  } catch (error) {
+    console.error("Error setting up Gmail client:", error);
+    throw error;
+  }
 };
 
-// Create email content in base64 encoded format that's URL-safe
+// Create email content in base64 encoded format that's URL-safe with improved implementation
 const createEmail = (to: string, subject: string, html: string): string => {
-  const emailLines = [
-    `To: ${to}`,
-    'From: XTech Consulting <XtechInfoQat@gmail.com>',
-    'Content-Type: text/html; charset=utf-8',
-    `Subject: ${subject}`,
-    '',
-    html
-  ];
-  
-  // For Deno environment, we need to use TextEncoder and btoa
-  const encoder = new TextEncoder();
-  const emailContent = emailLines.join('\r\n');
-  const uint8Array = encoder.encode(emailContent);
-  
-  // Convert Uint8Array to string
-  let binaryString = '';
-  uint8Array.forEach(byte => {
-    binaryString += String.fromCharCode(byte);
-  });
-  
-  // Base64 encode and make URL-safe
-  let base64 = btoa(binaryString)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  try {
+    console.log("Creating email to:", to);
+    console.log("Email subject:", subject);
     
-  console.log("Email encoded successfully, length:", base64.length);
-  return base64;
+    const emailLines = [
+      `To: ${to}`,
+      'From: XTech Consulting <XtechInfoQat@gmail.com>',
+      'Content-Type: text/html; charset=utf-8',
+      `Subject: ${subject}`,
+      '',
+      html
+    ];
+    
+    const emailContent = emailLines.join('\r\n');
+    console.log("Email content created, length:", emailContent.length);
+
+    // For Deno environment, use TextEncoder and btoa
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(emailContent);
+    
+    // Convert Uint8Array to string
+    let binaryString = '';
+    uint8Array.forEach(byte => {
+      binaryString += String.fromCharCode(byte);
+    });
+    
+    // Base64 encode and make URL-safe
+    let base64 = btoa(binaryString)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+      
+    console.log("Email encoded successfully, base64 length:", base64.length);
+    return base64;
+  } catch (error) {
+    console.error("Error creating email:", error);
+    throw error;
+  }
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -86,7 +101,12 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     console.log("Received booking confirmation request");
-    const { name, email, date, timeSlot, service, phone, notes }: BookingConfirmationRequest = await req.json();
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
+    
+    const requestBody = await req.json();
+    console.log("Request body:", JSON.stringify(requestBody));
+    
+    const { name, email, date, timeSlot, service, phone, notes }: BookingConfirmationRequest = requestBody;
     console.log(`Processing booking for ${name} at ${email} for ${date} ${timeSlot}`);
     
     // Format email content
@@ -127,55 +147,94 @@ const handler = async (req: Request): Promise<Response> => {
     `;
     
     try {
-      // Set up Gmail client
+      // Set up Gmail client with more robust error handling
       console.log("Setting up Gmail client...");
-      const gmail = setupGmailClient();
+      let gmail;
+      try {
+        gmail = setupGmailClient();
+        console.log("Gmail client initialized successfully");
+      } catch (clientError) {
+        console.error("Failed to initialize Gmail client:", clientError);
+        throw clientError;
+      }
       
       // Create the email content
       console.log("Creating email content...");
-      const rawEmail = createEmail(
-        email, 
-        `Your ${service} Consultation is Confirmed`, 
-        html
-      );
-      
-      console.log(`Sending email to: ${email}`);
-      
-      // Send email via Gmail API
-      const response = await gmail.users.messages.send({
-        userId: 'me',
-        requestBody: {
-          raw: rawEmail
-        }
-      });
-      
-      console.log("Email confirmation sent successfully:", response.data);
-      
-      return new Response(JSON.stringify({ 
-        success: true, 
-        data: response.data,
-        message: "Email sent successfully via Gmail API" 
-      }), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      });
-    } catch (emailError: any) {
-      console.error("Error sending email:", emailError);
-      
-      // Add more detailed error logging
-      if (emailError.response) {
-        console.error("API response error:", {
-          status: emailError.response.status,
-          statusText: emailError.response.statusText,
-          data: emailError.response.data
-        });
-      } else {
-        console.error("Error details:", emailError.message);
-        console.error("Error stack:", emailError.stack);
+      let rawEmail;
+      try {
+        rawEmail = createEmail(
+          email, 
+          `Your ${service} Consultation is Confirmed`, 
+          html
+        );
+        console.log("Email content created successfully");
+      } catch (contentError) {
+        console.error("Failed to create email content:", contentError);
+        throw contentError;
       }
+      
+      console.log(`Sending email to: ${email} via Gmail API`);
+      
+      // Send email via Gmail API with detailed error handling
+      try {
+        const response = await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: {
+            raw: rawEmail
+          }
+        });
+        
+        console.log("Email API response status:", response.status);
+        console.log("Email confirmation sent successfully:", JSON.stringify(response.data));
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: response.data,
+          message: "Email sent successfully via Gmail API" 
+        }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        });
+      } catch (sendError: any) {
+        console.error("Error sending email via Gmail API:", sendError);
+        
+        // Add more detailed error logging specific to Gmail API
+        if (sendError.response) {
+          console.error("Gmail API response error:", {
+            status: sendError.response.status,
+            statusText: sendError.response.statusText,
+            data: JSON.stringify(sendError.response.data)
+          });
+        } 
+        
+        if (sendError.message) {
+          console.error("Error details:", sendError.message);
+        }
+        
+        if (sendError.stack) {
+          console.error("Error stack:", sendError.stack);
+        }
+        
+        // Return a success response to the client even if email fails
+        // This way the booking is still confirmed in the system
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            emailSent: false,
+            message: "Booking confirmed but email could not be sent. Please contact support.",
+            error: sendError.message || "Unknown error sending email"
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
+      }
+    } catch (emailError: any) {
+      console.error("Error in email sending process:", emailError);
       
       // Return a success response to the client even if email fails
       // This way the booking is still confirmed in the system

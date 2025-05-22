@@ -28,10 +28,15 @@ const setupGmailClient = () => {
     throw new Error("Gmail API credentials are not configured properly");
   }
 
+  // Log the first few characters of each credential to confirm they're loaded
+  console.log("Client ID starts with:", CLIENT_ID.substring(0, 8) + "...");
+  console.log("Client Secret starts with:", CLIENT_SECRET.substring(0, 8) + "...");
+  console.log("Refresh Token starts with:", REFRESH_TOKEN.substring(0, 8) + "...");
+
   const oauth2Client = new google.auth.OAuth2(
     CLIENT_ID,
     CLIENT_SECRET,
-    "https://developers.google.com/oauthplayground"
+    "https://developers.google.com/oauthplayground" // Redirect URI
   );
 
   oauth2Client.setCredentials({
@@ -52,13 +57,25 @@ const createEmail = (to: string, subject: string, html: string): string => {
     html
   ];
   
-  // Base64 encode the email content (using URL-safe base64 encoding)
-  const rawEmail = Buffer.from(emailLines.join('\r\n')).toString('base64')
+  // For Deno environment, we need to use TextEncoder and btoa
+  const encoder = new TextEncoder();
+  const emailContent = emailLines.join('\r\n');
+  const uint8Array = encoder.encode(emailContent);
+  
+  // Convert Uint8Array to string
+  let binaryString = '';
+  uint8Array.forEach(byte => {
+    binaryString += String.fromCharCode(byte);
+  });
+  
+  // Base64 encode and make URL-safe
+  let base64 = btoa(binaryString)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
-  
-  return rawEmail;
+    
+  console.log("Email encoded successfully, length:", base64.length);
+  return base64;
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -68,7 +85,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log("Received booking confirmation request");
     const { name, email, date, timeSlot, service, phone, notes }: BookingConfirmationRequest = await req.json();
+    console.log(`Processing booking for ${name} at ${email} for ${date} ${timeSlot}`);
     
     // Format email content
     const html = `
@@ -109,19 +128,18 @@ const handler = async (req: Request): Promise<Response> => {
     
     try {
       // Set up Gmail client
+      console.log("Setting up Gmail client...");
       const gmail = setupGmailClient();
       
       // Create the email content
+      console.log("Creating email content...");
       const rawEmail = createEmail(
         email, 
         `Your ${service} Consultation is Confirmed`, 
         html
       );
       
-      // Add more detailed logging
-      console.log("Setting up Gmail API with client ID:", 
-                  Deno.env.get("GMAIL_CLIENT_ID")?.substring(0, 8) + "...");
-      console.log("Sending email to:", email);
+      console.log(`Sending email to: ${email}`);
       
       // Send email via Gmail API
       const response = await gmail.users.messages.send({
@@ -133,7 +151,11 @@ const handler = async (req: Request): Promise<Response> => {
       
       console.log("Email confirmation sent successfully:", response.data);
       
-      return new Response(JSON.stringify({ success: true, data: response.data }), {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        data: response.data,
+        message: "Email sent successfully via Gmail API" 
+      }), {
         status: 200,
         headers: {
           "Content-Type": "application/json",
@@ -150,6 +172,9 @@ const handler = async (req: Request): Promise<Response> => {
           statusText: emailError.response.statusText,
           data: emailError.response.data
         });
+      } else {
+        console.error("Error details:", emailError.message);
+        console.error("Error stack:", emailError.stack);
       }
       
       // Return a success response to the client even if email fails
@@ -158,7 +183,8 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ 
           success: true, 
           emailSent: false,
-          message: "Booking confirmed but email could not be sent. Please contact support."
+          message: "Booking confirmed but email could not be sent. Please contact support.",
+          error: emailError.message
         }),
         {
           status: 200,

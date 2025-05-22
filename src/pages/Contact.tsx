@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -5,9 +6,10 @@ import SectionTitle from "@/components/SectionTitle";
 import ContactForm from "@/components/ContactForm";
 import BookingCalendar from "@/components/BookingCalendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Phone, Mail, MapPin, Calendar, MessageSquare } from "lucide-react";
+import { Phone, Mail, MapPin, Calendar, MessageSquare, AlertCircle } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const Contact = () => {
   const [searchParams] = useSearchParams();
@@ -29,7 +31,7 @@ const Contact = () => {
     } else if (emailStatus === "success") {
       toast({
         title: "Booking Confirmed!",
-        description: "A confirmation email has been sent to your inbox.",
+        description: "A confirmation email has been sent to your inbox. Please check your spam folder if you don't see it.",
         duration: 5000,
       });
     }
@@ -44,6 +46,11 @@ const Contact = () => {
       });
     }
   }, [searchParams, toast]);
+  
+  // Get the tab parameter from the URL for highlighting appropriate tab
+  const tab = searchParams.get("tab") || "message";
+  const emailStatus = searchParams.get("email");
+  const bookingStatus = searchParams.get("booking");
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -61,6 +68,25 @@ const Contact = () => {
           </div>
         </div>
       </section>
+      
+      {/* Email Status Alert for bookings */}
+      {bookingStatus === "confirmed" && (
+        <div className="container mx-auto px-4 mb-8">
+          <Alert className={emailStatus === "failed" ? "bg-yellow-100/10 border-yellow-500" : "bg-green-100/10 border-green-500"}>
+            <AlertCircle className={emailStatus === "failed" ? "text-yellow-500" : "text-green-500"} />
+            <AlertTitle className="ml-2">
+              {emailStatus === "failed" 
+                ? "Booking Confirmed - Email Delivery Issue" 
+                : "Booking Successfully Confirmed"}
+            </AlertTitle>
+            <AlertDescription className="ml-2">
+              {emailStatus === "failed"
+                ? "Your booking has been successfully scheduled, but there was an issue sending the confirmation email. Our team has been notified."
+                : "Your consultation has been scheduled. A confirmation email has been sent to your inbox."}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
       
       {/* Contact Information */}
       <section className="py-8">
@@ -98,7 +124,7 @@ const Contact = () => {
       {/* Contact Form and Booking Calendar Tabs */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <Tabs defaultValue={searchParams.get("tab") || "message"} className="max-w-4xl mx-auto">
+          <Tabs defaultValue={tab} className="max-w-4xl mx-auto">
             <TabsList className="grid grid-cols-2 mb-8">
               <TabsTrigger value="message" className="flex items-center gap-2 text-lg py-3">
                 <MessageSquare size={18} />

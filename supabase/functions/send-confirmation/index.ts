@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { google } from "npm:googleapis@126.0.1";
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,86 +18,8 @@ interface BookingConfirmationRequest {
   notes?: string;
 }
 
-// Configure Gmail API with improved error handling
-const setupGmailClient = () => {
-  try {
-    console.log("Setting up Gmail client...");
-    
-    // Log environment variable availability (not their values)
-    console.log("GMAIL_CLIENT_ID available:", !!Deno.env.get("GMAIL_CLIENT_ID"));
-    console.log("GMAIL_CLIENT_SECRET available:", !!Deno.env.get("GMAIL_CLIENT_SECRET"));
-    console.log("GMAIL_REFRESH_TOKEN available:", !!Deno.env.get("GMAIL_REFRESH_TOKEN"));
-    
-    const CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
-    const CLIENT_SECRET = Deno.env.get("GMAIL_CLIENT_SECRET");
-    const REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
-    
-    if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
-      throw new Error("Gmail API credentials are not configured properly");
-    }
-
-    // Create OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
-      CLIENT_ID,
-      CLIENT_SECRET,
-      "https://developers.google.com/oauthplayground" // Redirect URI
-    );
-
-    oauth2Client.setCredentials({
-      refresh_token: REFRESH_TOKEN
-    });
-
-    // Test token by getting a new access token
-    console.log("Testing OAuth token refresh...");
-    return google.gmail({ version: 'v1', auth: oauth2Client });
-  } catch (error) {
-    console.error("Error setting up Gmail client:", error);
-    throw error;
-  }
-};
-
-// Create email content in base64 encoded format
-const createEmail = (to: string, subject: string, html: string): string => {
-  try {
-    console.log("Creating email to:", to);
-    console.log("Email subject:", subject);
-    console.log("Email content length:", html.length);
-    
-    const emailLines = [
-      `To: ${to}`,
-      'From: XTech Consulting <XtechInfoQat@gmail.com>',
-      'Content-Type: text/html; charset=utf-8',
-      'MIME-Version: 1.0',
-      `Subject: ${subject}`,
-      '',
-      html
-    ];
-    
-    const emailContent = emailLines.join('\r\n');
-    
-    // For Deno environment
-    const encoder = new TextEncoder();
-    const uint8Array = encoder.encode(emailContent);
-    
-    // Convert Uint8Array to string
-    let binaryString = '';
-    uint8Array.forEach(byte => {
-      binaryString += String.fromCharCode(byte);
-    });
-    
-    // Base64 encode and make URL-safe
-    let base64 = btoa(binaryString)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-      
-    console.log("Email encoded successfully, base64 length:", base64.length);
-    return base64;
-  } catch (error) {
-    console.error("Error creating email:", error);
-    throw error;
-  }
-};
+// Initialize Resend client
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const handler = async (req: Request): Promise<Response> => {
   console.log("Booking confirmation request received");
@@ -157,76 +79,46 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Email HTML content prepared");
     
     try {
-      console.log("Initializing Gmail client...");
-      const gmail = setupGmailClient();
-      console.log("Gmail client setup complete");
+      console.log("Sending email with Resend...");
       
-      console.log("Creating email content...");
-      const rawEmail = createEmail(
-        email, 
-        `Your ${service} Consultation is Confirmed`, 
-        html
-      );
-      console.log("Email content created");
+      // Attempt to send email with Resend
+      const emailResponse = await resend.emails.send({
+        from: "XTech Consulting <onboarding@resend.dev>",
+        to: [email],
+        subject: `Your ${service} Consultation is Confirmed`,
+        html: html,
+      });
       
-      console.log(`Attempting to send email to: ${email} via Gmail API`);
-      try {
-        const result = await gmail.users.messages.send({
-          userId: 'me',
-          requestBody: {
-            raw: rawEmail
-          }
-        });
-        
-        console.log("Gmail API response status:", result.status);
-        console.log("Gmail API response:", JSON.stringify(result.data, null, 2));
-        
-        if (result.status === 200) {
-          console.log("Email successfully sent!");
-          return new Response(JSON.stringify({ 
-            success: true, 
-            emailSent: true,
-            message: "Email confirmation sent successfully",
-            data: result.data
-          }), {
-            status: 200,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-          });
-        } else {
-          throw new Error(`Gmail API returned status: ${result.status}`);
-        }
-      } catch (sendError: any) {
-        // Detailed error logging
-        console.error("Error sending email via Gmail API:", sendError);
-        
-        if (sendError.response) {
-          console.error("Gmail API error response:", {
-            status: sendError.response.status,
-            statusText: sendError.response.statusText,
-            data: JSON.stringify(sendError.response.data)
-          });
-        }
-        
-        if (sendError.errors && sendError.errors.length > 0) {
-          console.error("Gmail API errors:", JSON.stringify(sendError.errors));
-        }
-        
-        // Return a response indicating booking success but email failure
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            emailSent: false,
-            message: "Booking confirmed but email could not be sent",
-            error: sendError.message || "Unknown error sending email"
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-          }
-        );
+      console.log("Resend API response:", JSON.stringify(emailResponse, null, 2));
+      
+      if (emailResponse.error) {
+        throw new Error(`Resend API error: ${emailResponse.error.message}`);
       }
-    } catch (emailError) {
-      console.error("Email creation/setup error:", emailError);
+      
+      console.log("Email successfully sent!");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          emailSent: true,
+          message: "Email confirmation sent successfully",
+          data: emailResponse
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    } catch (sendError: any) {
+      // Detailed error logging for email sending failures
+      console.error("Error sending email via Resend:", sendError);
+      
+      if (sendError.response) {
+        console.error("Resend API error response:", {
+          status: sendError.response.status,
+          statusText: sendError.response.statusText,
+          data: JSON.stringify(sendError.response.data)
+        });
+      }
       
       // Return a response indicating booking success but email failure
       return new Response(
@@ -234,7 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
           success: true, 
           emailSent: false,
           message: "Booking confirmed but email could not be sent",
-          error: emailError instanceof Error ? emailError.message : "Unknown email error"
+          error: sendError.message || "Unknown error sending email"
         }),
         {
           status: 200,

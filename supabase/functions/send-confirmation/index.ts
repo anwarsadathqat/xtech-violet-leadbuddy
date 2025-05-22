@@ -1,61 +1,49 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { google } from "npm:googleapis@126.0.1";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
-
-interface EmailRequest {
-  name: string;
-  email: string;
-  date?: string;
-  timeSlot?: string;
-  service: string;
-  phone?: string;
-  notes?: string;
-  message?: string;
-  isContactForm?: boolean;
-}
-
-// Initialize OAuth2 client for Gmail API
-const createOAuth2Client = () => {
-  console.log("Setting up OAuth2 client for Gmail API");
-  
+// Function to refresh the access token using the refresh token
+const refreshAccessToken = async ()=>{
+  console.log("Refreshing access token...");
   const CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
   const CLIENT_SECRET = Deno.env.get("GMAIL_CLIENT_SECRET");
   const REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
-  const REDIRECT_URI = "https://developers.google.com/oauthplayground";
-  
   console.log("Credentials available:", {
     clientId: CLIENT_ID ? "✓" : "✗",
     clientSecret: CLIENT_SECRET ? "✓" : "✗",
     refreshToken: REFRESH_TOKEN ? "✓" : "✗"
   });
-  
   if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
     throw new Error("Missing Gmail API credentials. Check environment variables.");
   }
-  
-  const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-  oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
-  return oAuth2Client;
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      refresh_token: REFRESH_TOKEN,
+      grant_type: "refresh_token"
+    }).toString()
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    console.error("Failed to refresh access token:", data);
+    throw new Error(`Failed to refresh access token: ${JSON.stringify(data)}`);
+  }
+  console.log("Access token refreshed:", data.access_token);
+  return data.access_token;
 };
-
-// Send email using Gmail API
-const sendGmailEmail = async (
-  to: string,
-  subject: string,
-  htmlContent: string
-): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+// Send email using Gmail API via raw HTTP request
+const sendGmailEmail = async (to, subject, htmlContent)=>{
   try {
     console.log(`Attempting to send email to: ${to}`);
-    const oAuth2Client = createOAuth2Client();
-    const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
-    
-    // Create email with both plain text and HTML parts
+    // Refresh the access token
+    const accessToken = await refreshAccessToken();
+    // Create email with HTML content
     const email = [
       `To: ${to}`,
       `From: "XTech Consulting" <XtechInfoQat@gmail.com>`,
@@ -65,42 +53,40 @@ const sendGmailEmail = async (
       '',
       htmlContent
     ].join('\n');
-    
     // Encode the email for Gmail API
-    const encodedEmail = btoa(unescape(encodeURIComponent(email)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-    
+    const encodedEmail = btoa(unescape(encodeURIComponent(email))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     console.log("Email content prepared and encoded");
-    
-    // Send the email
-    const response = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw: encodedEmail }
+    // Send the email via Gmail API
+    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        raw: encodedEmail
+      })
     });
-    
-    console.log("Gmail API response:", JSON.stringify(response.data));
-    return { 
-      success: true, 
-      messageId: response.data.id 
-    };
-  } catch (error: any) {
-    console.error("Error sending Gmail email:", error);
-    
-    if (error.response) {
-      console.error("API Error details:", JSON.stringify(error.response.data));
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("Failed to send email:", data);
+      throw new Error(`Gmail API error: ${JSON.stringify(data)}`);
     }
-    
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Unknown error sending email" 
+    console.log("Gmail API response:", JSON.stringify(data));
+    return {
+      success: true,
+      messageId: data.id
+    };
+  } catch (error) {
+    console.error("Error sending Gmail email:", error.message);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error sending email"
     };
   }
 };
-
 // Create booking confirmation email HTML template
-const createBookingConfirmationEmail = (data: EmailRequest): string => {
+const createBookingConfirmationEmail = (data)=>{
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
       <div style="background-color: #6c22d8; padding: 20px; text-align: center; color: white;">
@@ -137,9 +123,8 @@ const createBookingConfirmationEmail = (data: EmailRequest): string => {
     </div>
   `;
 };
-
 // Create contact form notification email HTML template
-const createContactFormEmail = (data: EmailRequest): string => {
+const createContactFormEmail = (data)=>{
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
       <div style="background-color: #6c22d8; padding: 20px; text-align: center; color: white;">
@@ -169,9 +154,8 @@ const createContactFormEmail = (data: EmailRequest): string => {
     </div>
   `;
 };
-
 // Create acknowledgement email for contact form submissions
-const createContactAcknowledgementEmail = (data: EmailRequest): string => {
+const createContactAcknowledgementEmail = (data)=>{
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
       <div style="background-color: #6c22d8; padding: 20px; text-align: center; color: white;">
@@ -204,109 +188,84 @@ const createContactAcknowledgementEmail = (data: EmailRequest): string => {
     </div>
   `;
 };
-
-const handler = async (req: Request): Promise<Response> => {
+const handler = async (req)=>{
   console.log("Email request received");
   console.log("Request method:", req.method);
-  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     console.log("Handling CORS preflight request");
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders
+    });
   }
-
   try {
     console.log("Parsing request body...");
     const requestData = await req.json();
     console.log("Request body received:", JSON.stringify(requestData, null, 2));
-    
-    const data: EmailRequest = requestData;
-    
+    const data = requestData;
     // Determine email type and content based on isContactForm flag
-    let emailSubject: string;
-    let emailContent: string;
+    let emailSubject;
+    let emailContent;
     let emailResult;
-    let recipientEmail: string;
-    
+    let recipientEmail;
     if (data.isContactForm) {
       console.log("Processing contact form submission");
-      
       // First send notification to admin
       emailSubject = `New Contact: ${data.service} Inquiry from ${data.name}`;
       emailContent = createContactFormEmail(data);
       recipientEmail = "XtechInfoQat@gmail.com"; // Admin email
-      
       console.log("Sending admin notification email");
-      emailResult = await sendGmailEmail(
-        recipientEmail,
-        emailSubject,
-        emailContent
-      );
-      
+      emailResult = await sendGmailEmail(recipientEmail, emailSubject, emailContent);
       if (!emailResult.success) {
         console.error("Failed to send admin notification:", emailResult.error);
-        // Continue to try sending customer acknowledgement
+      // Continue to try sending customer acknowledgement
       }
-      
       // Then send acknowledgement to customer
       emailSubject = `XTech Consulting: We've Received Your Message`;
       emailContent = createContactAcknowledgementEmail(data);
       recipientEmail = data.email;
-      
       console.log("Sending customer acknowledgement email");
-      emailResult = await sendGmailEmail(
-        recipientEmail,
-        emailSubject,
-        emailContent
-      );
+      emailResult = await sendGmailEmail(recipientEmail, emailSubject, emailContent);
     } else {
       console.log("Processing booking confirmation");
-      
       emailSubject = `Your ${data.service} Consultation is Confirmed`;
       emailContent = createBookingConfirmationEmail(data);
       recipientEmail = data.email;
-      
       console.log("Sending booking confirmation email");
-      emailResult = await sendGmailEmail(
-        recipientEmail,
-        emailSubject,
-        emailContent
-      );
+      emailResult = await sendGmailEmail(recipientEmail, emailSubject, emailContent);
     }
-    
     console.log("Gmail API result:", JSON.stringify(emailResult));
-    
     if (!emailResult.success) {
       throw new Error(`Gmail API error: ${emailResult.error}`);
     }
-    
     console.log("Email successfully sent!");
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        emailSent: true,
-        message: "Email sent successfully",
-        data: { messageId: emailResult.messageId }
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+    return new Response(JSON.stringify({
+      success: true,
+      emailSent: true,
+      message: "Email sent successfully",
+      data: {
+        messageId: emailResult.messageId
       }
-    );
+    }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders
+      }
+    });
   } catch (error) {
     console.error("Error in email sending function:", error);
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        emailSent: false,
-        error: error instanceof Error ? error.message : "Unknown error in processing request" 
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+    return new Response(JSON.stringify({
+      success: false,
+      emailSent: false,
+      error: error instanceof Error ? error.message : "Unknown error in processing request"
+    }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders
       }
-    );
+    });
   }
 };
-
 serve(handler);

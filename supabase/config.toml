@@ -1,8 +1,21 @@
 
 project_id = "zuajpsrnynudfgmqiqch"
 
-[functions.send-confirmation]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[[edge_functions]]
+name = "send-confirmation"
 verify_jwt = false
 
-[functions.store-lead]
+[[edge_functions]]
+name = "store-lead"
 verify_jwt = false

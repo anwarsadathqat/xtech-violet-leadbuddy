@@ -12,6 +12,7 @@ const ContactForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     service: 'Consultancy',
     message: ''
   });
@@ -32,7 +33,7 @@ const ContactForm = () => {
           body: {
             name: formData.name,
             email: formData.email,
-            phone: "", // No phone field in this form
+            phone: formData.phone, // Now passing phone number
             inquiry: formData.message,
             source: "contact_form"
           }
@@ -51,6 +52,7 @@ const ContactForm = () => {
         body: {
           name: formData.name,
           email: formData.email,
+          phone: formData.phone, // Now passing phone number
           service: formData.service,
           message: formData.message,
           isContactForm: true
@@ -72,6 +74,7 @@ const ContactForm = () => {
       setFormData({
         name: '',
         email: '',
+        phone: '',
         service: 'Consultancy',
         message: ''
       });
@@ -116,6 +119,20 @@ const ContactForm = () => {
           className="w-full p-3 rounded-md bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-xtech-blue"
           placeholder="your@email.com"
           required
+        />
+      </div>
+      
+      <div>
+        <label htmlFor="phone" className="block mb-2 text-sm font-medium">
+          Phone Number
+        </label>
+        <input
+          type="tel"
+          id="phone"
+          value={formData.phone}
+          onChange={handleChange}
+          className="w-full p-3 rounded-md bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-xtech-blue"
+          placeholder="Your phone number"
         />
       </div>
       

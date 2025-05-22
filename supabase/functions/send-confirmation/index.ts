@@ -1,8 +1,11 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
+
 // Function to refresh the access token using the refresh token
 const refreshAccessToken = async ()=>{
   console.log("Refreshing access token...");
@@ -37,6 +40,7 @@ const refreshAccessToken = async ()=>{
   console.log("Access token refreshed:", data.access_token);
   return data.access_token;
 };
+
 // Send email using Gmail API via raw HTTP request
 const sendGmailEmail = async (to, subject, htmlContent)=>{
   try {
@@ -85,6 +89,7 @@ const sendGmailEmail = async (to, subject, htmlContent)=>{
     };
   }
 };
+
 // Create booking confirmation email HTML template
 const createBookingConfirmationEmail = (data)=>{
   return `
@@ -123,6 +128,7 @@ const createBookingConfirmationEmail = (data)=>{
     </div>
   `;
 };
+
 // Create contact form notification email HTML template
 const createContactFormEmail = (data)=>{
   return `
@@ -138,6 +144,7 @@ const createContactFormEmail = (data)=>{
         <div style="background-color: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px;">
           <p><strong>Name:</strong> ${data.name}</p>
           <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Phone:</strong> ${data.phone || 'Not provided'}</p>
           <p><strong>Service Needed:</strong> ${data.service}</p>
           <p><strong>Message:</strong></p>
           <p style="white-space: pre-wrap;">${data.message}</p>
@@ -154,6 +161,7 @@ const createContactFormEmail = (data)=>{
     </div>
   `;
 };
+
 // Create acknowledgement email for contact form submissions
 const createContactAcknowledgementEmail = (data)=>{
   return `
@@ -188,6 +196,7 @@ const createContactAcknowledgementEmail = (data)=>{
     </div>
   `;
 };
+
 const handler = async (req)=>{
   console.log("Email request received");
   console.log("Request method:", req.method);
@@ -268,4 +277,5 @@ const handler = async (req)=>{
     });
   }
 };
+
 serve(handler);

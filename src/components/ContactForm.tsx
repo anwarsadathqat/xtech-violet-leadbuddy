@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const ContactForm = () => {
   const { toast } = useToast();
@@ -25,23 +26,46 @@ const ContactForm = () => {
     setIsSubmitting(true);
     
     try {
-      // Create mailto URL with form data
-      const subject = `XTech Inquiry: ${formData.service}`;
-      const body = `
-Name: ${formData.name}
-Email: ${formData.email}
-Service: ${formData.service}
-
-Message:
-${formData.message}
-      `;
+      // Store the lead in the database
+      try {
+        const { error } = await supabase.functions.invoke('store-lead', {
+          body: {
+            name: formData.name,
+            email: formData.email,
+            phone: "", // No phone field in this form
+            inquiry: formData.message,
+            source: "contact_form"
+          }
+        });
+        
+        if (error) {
+          console.error("Error storing lead:", error);
+        }
+      } catch (storageError) {
+        console.error("Error storing lead data:", storageError);
+        // Continue with email even if lead storage fails
+      }
       
-      // Open default mail client with pre-filled data
-      window.location.href = `mailto:XtechInfoQat@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // Send contact email notification
+      const response = await supabase.functions.invoke('send-confirmation', {
+        body: {
+          name: formData.name,
+          email: formData.email,
+          service: formData.service,
+          message: formData.message,
+          isContactForm: true
+        }
+      });
+      
+      console.log("Email function response:", response);
+      
+      if (response.error) {
+        throw new Error(response.error.message || "Error sending email");
+      }
       
       toast({
-        title: "Form submitted!",
-        description: "Your email client should open with the form details.",
+        title: "Message sent successfully!",
+        description: "We've received your message and will get back to you soon.",
       });
       
       // Reset form
@@ -53,7 +77,7 @@ ${formData.message}
       });
     } catch (error) {
       toast({
-        title: "Error submitting form",
+        title: "Error sending message",
         description: "Please try again or contact us directly.",
         variant: "destructive",
       });
@@ -132,7 +156,7 @@ ${formData.message}
         disabled={isSubmitting}
         className="w-full py-6 bg-gradient-to-r from-xtech-purple to-xtech-blue text-white rounded-md hover:from-xtech-blue hover:to-xtech-purple transition-all flex items-center justify-center gap-2"
       >
-        {isSubmitting ? "Submitting..." : "Submit"}
+        {isSubmitting ? "Sending..." : "Send Message"}
         <Mail className="h-4 w-4" />
       </Button>
     </form>

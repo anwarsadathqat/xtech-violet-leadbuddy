@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar as CalendarIcon, Clock, Mail, Calendar as CalendarCheck, CheckCircle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface BookingCalendarProps {
   serviceName?: string;
@@ -29,6 +29,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleNextStep = () => {
     if (currentStep === 1 && !date) {
@@ -92,21 +93,30 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
   }) => {
     setIsSendingEmail(true);
     try {
+      console.log("Sending booking confirmation email:", bookingData);
+      
       // Call the Supabase edge function to send the confirmation email
       const { data, error } = await supabase.functions.invoke("send-confirmation", {
         body: bookingData,
       });
 
+      console.log("Email function response:", data);
+      
       if (error) {
         console.error("Error sending confirmation email:", error);
-        return false;
+        return { sent: false, error };
       }
 
-      console.log("Email confirmation response:", data);
-      return true;
+      // Check if the email was actually sent
+      if (data && data.emailSent === false) {
+        console.log("Email delivery failed:", data.error || "Unknown reason");
+        return { sent: false, error: data.error };
+      }
+
+      return { sent: true };
     } catch (err) {
-      console.error("Failed to send confirmation email:", err);
-      return false;
+      console.error("Exception in sendConfirmationEmail:", err);
+      return { sent: false, error: err instanceof Error ? err.message : "Unknown error" };
     } finally {
       setIsSendingEmail(false);
     }
@@ -149,7 +159,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
           console.log("Booking saved successfully:", data);
           
           // Send confirmation email
-          const emailSent = await sendConfirmationEmail({
+          const emailResult = await sendConfirmationEmail({
             name,
             email,
             date: formattedDate,
@@ -159,21 +169,34 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ serviceName }) => {
             notes
           });
           
-          setEmailSent(emailSent);
+          setEmailSent(emailResult.sent);
+          
+          // If we're redirecting to show email status (optional enhancement)
+          if (emailResult.sent) {
+            // Give the user a moment to see the success screen then redirect
+            setTimeout(() => {
+              navigate(`/contact?tab=booking&booking=confirmed&email=success`);
+            }, 2000);
+          } else {
+            // If email failed, you might want to show that in the URL parameters
+            setTimeout(() => {
+              navigate(`/contact?tab=booking&booking=confirmed&email=failed`);
+            }, 2000);
+          }
         }
       } catch (err) {
         console.error("Supabase error:", err);
         // Continue with UI flow even if DB save fails
       }
       
-      // Show success message
+      // Show success message regardless of email status
       toast({
         title: "Booking Confirmed!",
         description: `Your appointment on ${formattedDate} at ${timeSlot} has been scheduled.`,
       });
       
-      // Reset form
-      setCurrentStep(4); // Success step
+      // Set to success step
+      setCurrentStep(4);
     } catch (error) {
       console.error("Booking error:", error);
       toast({

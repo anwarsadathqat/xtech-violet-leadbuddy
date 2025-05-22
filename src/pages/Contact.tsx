@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -31,6 +30,16 @@ const Contact = () => {
       toast({
         title: "Booking Confirmed!",
         description: "A confirmation email has been sent to your inbox.",
+        duration: 5000,
+      });
+    }
+    
+    // Additionally check for booking status
+    const bookingStatus = searchParams.get("booking");
+    if (bookingStatus === "confirmed") {
+      toast({
+        title: "Booking Confirmed!",
+        description: "Your consultation has been scheduled successfully.",
         duration: 5000,
       });
     }

@@ -164,7 +164,7 @@ const handler = async (req: Request): Promise<Response> => {
         html
       );
       
-      console.log("Gmail API result:", JSON.stringify(emailResult, null, 2));
+      console.log("Gmail API result:", JSON.stringify(emailResult));
       
       if (!emailResult.success) {
         throw new Error(`Gmail API error: ${emailResult.error}`);

@@ -35,7 +35,7 @@ serve(async (req) => {
     const leadData: LeadRequest = await req.json();
     
     // Validate required fields
-    if (!leadData.name || !leadData.email || !leadData.phone) {
+    if (!leadData.name || !leadData.email) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         {
@@ -45,6 +45,9 @@ serve(async (req) => {
       );
     }
     
+    // Set default phone value if empty
+    const phone = leadData.phone || "Not provided";
+    
     // Insert the lead into the database
     const { data, error } = await supabase
       .from("leads")
@@ -52,7 +55,7 @@ serve(async (req) => {
         {
           name: leadData.name,
           email: leadData.email,
-          phone: leadData.phone,
+          phone: phone,
           inquiry: leadData.inquiry || "",
           source: leadData.source || "website",
           status: "new",

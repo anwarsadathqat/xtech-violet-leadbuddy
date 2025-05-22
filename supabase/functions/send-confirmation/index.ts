@@ -124,7 +124,7 @@ const createBookingConfirmationEmail = (data: EmailRequest): string => {
           ${data.notes ? `<li>Notes: ${data.notes}</li>` : ''}
         </ul>
         
-        <p>If you need to reschedule or have any questions, please contact our support team at XtechInfoQat@gmail.com.</p>
+        <p>If you need to reschedule or have any questions, please contact our support team at <a href="mailto:XtechInfoQat@gmail.com">XtechInfoQat@gmail.com</a>.</p>
         
         <p>We look forward to speaking with you!</p>
         
@@ -183,12 +183,15 @@ const createContactAcknowledgementEmail = (data: EmailRequest): string => {
         <p>Thank you for contacting XTech Consulting. We have received your message regarding ${data.service}.</p>
         
         <div style="background-color: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px;">
-          <p>A member of our team will review your inquiry and get back to you shortly.</p>
+          <p><strong>Your message:</strong></p>
+          <p style="white-space: pre-wrap;">${data.message}</p>
         </div>
+        
+        <p>A member of our team will review your inquiry and get back to you shortly.</p>
         
         <p>For urgent matters, please contact us directly at:</p>
         <ul>
-          <li>Email: XtechInfoQat@gmail.com</li>
+          <li>Email: <a href="mailto:XtechInfoQat@gmail.com">XtechInfoQat@gmail.com</a></li>
           <li>Phone: +974 1234 5678</li>
         </ul>
         

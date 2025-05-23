@@ -112,21 +112,41 @@ const EnhancedLeadManagement = () => {
   const processNewLead = async (newLead: any) => {
     console.log('🤖 LeadBuddy: Processing new lead...', newLead.name);
     
-    // Simulate AI processing
-    const score = calculateLeadScore(newLead);
-    const insights = generateAIInsights(newLead);
-    
-    toast({
-      title: "🤖 LeadBuddy Analysis Complete",
-      description: `Lead score: ${score}/100. ${insights}`,
-    });
-    
-    // Auto-assign status based on score
-    if (score > 80) {
-      await updateLeadStatus(newLead.id, 'qualified');
+    try {
+      // Call DeepSeek AI to analyze the lead
+      const response = await supabase.functions.invoke('analyze-lead', {
+        body: { lead: newLead }
+      });
+
+      if (response.data) {
+        const { score, insights, recommendedAction } = response.data;
+        
+        toast({
+          title: "🤖 LeadBuddy Analysis Complete",
+          description: `Lead score: ${score}/100. ${insights}`,
+        });
+        
+        // Auto-assign status based on score
+        if (score > 80) {
+          await updateLeadStatus(newLead.id, 'qualified');
+          toast({
+            title: "⭐ High-value lead detected!",
+            description: `${newLead.name} has been automatically qualified for priority follow-up.`,
+          });
+        }
+
+        // Execute recommended action
+        await executeAIAction(newLead.id, recommendedAction, newLead);
+      }
+    } catch (error) {
+      console.error('Error processing lead with AI:', error);
+      // Fallback to local scoring
+      const score = calculateLeadScore(newLead);
+      const insights = generateAIInsights(newLead);
+      
       toast({
-        title: "⭐ High-value lead detected!",
-        description: `${newLead.name} has been automatically qualified for priority follow-up.`,
+        title: "🤖 LeadBuddy Analysis Complete",
+        description: `Lead score: ${score}/100. ${insights}`,
       });
     }
   };
@@ -141,7 +161,7 @@ const EnhancedLeadManagement = () => {
     if (email.includes('company.com') || email.includes('corp.com')) score += 15;
     
     // Phone presence
-    if (lead.phone) score += 15;
+    if (lead.phone && lead.phone !== 'Not provided') score += 15;
     
     // Inquiry content analysis
     const inquiry = lead.inquiry?.toLowerCase() || '';
@@ -227,31 +247,57 @@ const EnhancedLeadManagement = () => {
     }
   };
 
-  const executeAIAction = async (leadId: string, action: string) => {
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead) return;
+  const executeAIAction = async (leadId: string, action: string, lead?: any) => {
+    const leadData = lead || leads.find(l => l.id === leadId);
+    if (!leadData) return;
     
-    console.log(`🤖 LeadBuddy: Executing ${action} for ${lead.name}`);
+    console.log(`🤖 LeadBuddy: Executing ${action} for ${leadData.name}`);
     
-    switch (action) {
-      case 'send_email':
-        toast({
-          title: "📧 Email Sent",
-          description: `LeadBuddy sent a personalized email to ${lead.name}`,
-        });
-        break;
-      case 'schedule_call':
-        toast({
-          title: "📞 Call Scheduled",
-          description: `Follow-up call scheduled with ${lead.name}`,
-        });
-        break;
-      case 'send_demo':
-        toast({
-          title: "🎥 Demo Sent",
-          description: `Product demo link sent to ${lead.name}`,
-        });
-        break;
+    try {
+      // Call the AI automation edge function
+      const response = await supabase.functions.invoke('execute-lead-action', {
+        body: { 
+          leadId, 
+          action, 
+          leadData 
+        }
+      });
+
+      if (response.data?.success) {
+        switch (action) {
+          case 'send_welcome_email':
+            toast({
+              title: "📧 Welcome Email Sent",
+              description: `LeadBuddy sent a personalized welcome email to ${leadData.name}`,
+            });
+            break;
+          case 'schedule_follow_up':
+            toast({
+              title: "📞 Follow-up Scheduled",
+              description: `Follow-up call scheduled with ${leadData.name}`,
+            });
+            break;
+          case 'send_demo_link':
+            toast({
+              title: "🎥 Demo Link Sent",
+              description: `Product demo link sent to ${leadData.name}`,
+            });
+            break;
+          case 'priority_outreach':
+            toast({
+              title: "⭐ Priority Outreach Initiated",
+              description: `High-priority outreach sequence started for ${leadData.name}`,
+            });
+            break;
+        }
+      }
+    } catch (error) {
+      console.error('Error executing AI action:', error);
+      toast({
+        title: "Error",
+        description: "Failed to execute AI action. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -421,7 +467,7 @@ const EnhancedLeadManagement = () => {
                               size="sm" 
                               variant="outline"
                               className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                              onClick={() => executeAIAction(lead.id, 'send_email')}
+                              onClick={() => executeAIAction(lead.id, 'send_welcome_email')}
                             >
                               <Mail size={14} />
                             </Button>
@@ -429,7 +475,7 @@ const EnhancedLeadManagement = () => {
                               size="sm" 
                               variant="outline"
                               className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                              onClick={() => executeAIAction(lead.id, 'schedule_call')}
+                              onClick={() => executeAIAction(lead.id, 'schedule_follow_up')}
                             >
                               <Phone size={14} />
                             </Button>
@@ -437,7 +483,7 @@ const EnhancedLeadManagement = () => {
                               size="sm" 
                               variant="outline"
                               className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                              onClick={() => executeAIAction(lead.id, 'send_demo')}
+                              onClick={() => executeAIAction(lead.id, 'send_demo_link')}
                             >
                               <Eye size={14} />
                             </Button>

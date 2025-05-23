@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { 
   Calendar, Phone, Mail, Bot, TrendingUp, Users, 
-  DollarSign, Star, Clock, Eye, MessageSquare
+  DollarSign, Star, Clock, Eye, MessageSquare, RefreshCw
 } from 'lucide-react';
 import LeadStatusBadge from './LeadStatusBadge';
 
@@ -47,7 +47,63 @@ const EnhancedLeadManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [scoreFilter, setScoreFilter] = useState<string>('all');
 
+  const fetchLeads = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🔄 Fetching leads from Supabase...');
+      
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('❌ Error fetching leads:', error);
+        throw error;
+      }
+      
+      console.log('✅ Raw Supabase data:', data);
+      console.log('✅ Number of leads fetched:', data?.length || 0);
+      
+      // Enhance leads with AI scoring and insights
+      const enhancedLeads = data?.map(lead => {
+        const score = calculateLeadScore(lead);
+        const insights = generateAIInsights(lead);
+        const nextAction = determineNextAction(lead);
+        
+        console.log(`🤖 Enhanced lead ${lead.name}: score=${score}, insights=${insights}`);
+        
+        return {
+          ...lead,
+          lead_score: score,
+          ai_insights: insights,
+          next_action: nextAction
+        };
+      }) || [];
+      
+      console.log('✅ Enhanced leads:', enhancedLeads);
+      setLeads(enhancedLeads);
+      
+      if (enhancedLeads.length > 0) {
+        toast({
+          title: "✅ Leads loaded successfully",
+          description: `Found ${enhancedLeads.length} leads in database`,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error fetching leads:', error);
+      toast({
+        title: "Error fetching leads",
+        description: `Database error: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
+    console.log('🚀 Component mounted, fetching leads...');
     fetchLeads();
     
     // Set up real-time subscription
@@ -58,7 +114,7 @@ const EnhancedLeadManagement = () => {
         schema: 'public', 
         table: 'leads' 
       }, payload => {
-        console.log('Real-time update:', payload);
+        console.log('🔔 Real-time update:', payload);
         fetchLeads(); // Refresh data
         
         if (payload.eventType === 'INSERT') {
@@ -77,44 +133,6 @@ const EnhancedLeadManagement = () => {
       supabase.removeChannel(channel);
     };
   }, []);
-
-  const fetchLeads = async () => {
-    setIsLoading(true);
-    try {
-      console.log('🔄 Fetching leads from Supabase...');
-      
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (error) {
-        console.error('❌ Error fetching leads:', error);
-        throw error;
-      }
-      
-      console.log('✅ Leads fetched successfully:', data?.length || 0, 'leads');
-      
-      // Enhance leads with AI scoring and insights
-      const enhancedLeads = data?.map(lead => ({
-        ...lead,
-        lead_score: calculateLeadScore(lead),
-        ai_insights: generateAIInsights(lead),
-        next_action: determineNextAction(lead)
-      })) || [];
-      
-      setLeads(enhancedLeads);
-    } catch (error) {
-      console.error('Error fetching leads:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch leads. Please check console for details.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const processNewLead = async (newLead: any) => {
     console.log('🤖 LeadBuddy: Processing new lead...', newLead.name);
@@ -355,10 +373,25 @@ const EnhancedLeadManagement = () => {
               </CardTitle>
               <CardDescription className="text-gray-400">
                 AI-powered lead scoring and automated lifecycle management • {leads.length} total leads
+                {leads.length === 0 && (
+                  <span className="block text-red-400 text-sm mt-1">
+                    Debug: No leads found in database. Check Supabase connection.
+                  </span>
+                )}
               </CardDescription>
             </div>
             
             <div className="flex flex-col md:flex-row gap-4">
+              <Button
+                onClick={fetchLeads}
+                variant="outline"
+                className="border-white/20 hover:bg-white/10 text-white"
+                disabled={isLoading}
+              >
+                <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+                Refresh
+              </Button>
+              
               <Input
                 placeholder="Search leads..."
                 value={searchQuery}
@@ -408,12 +441,24 @@ const EnhancedLeadManagement = () => {
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <Users size={48} className="text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-white mb-2">No leads found</h3>
-              <p className="text-gray-400">
+              <p className="text-gray-400 mb-4">
                 {leads.length === 0 
-                  ? "No leads have been captured yet. Check your Supabase connection."
+                  ? "No leads have been captured yet. Database appears empty."
                   : `${leads.length} total leads, but none match your current filters.`
                 }
               </p>
+              <Button 
+                onClick={fetchLeads}
+                variant="outline"
+                className="border-white/20 hover:bg-white/10 text-white"
+              >
+                <RefreshCw size={16} className="mr-2" />
+                Try Refresh
+              </Button>
+              <div className="mt-4 text-sm text-gray-500">
+                <p>Debug info: Fetched {leads.length} leads from Supabase</p>
+                <p>Applied filters: Status={statusFilter}, Score={scoreFilter}</p>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

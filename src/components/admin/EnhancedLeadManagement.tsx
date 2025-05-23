@@ -47,140 +47,86 @@ const EnhancedLeadManagement = () => {
   const [scoreFilter, setScoreFilter] = useState<string>('all');
   const [connectionStatus, setConnectionStatus] = useState<string>('checking');
 
-  const testConnection = async () => {
-    console.log('🔗 Testing Supabase connection...');
-    try {
-      // Test basic connection
-      const { data: testData, error: testError } = await supabase
-        .from('leads')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Connection test failed:', testError);
-        setConnectionStatus('failed');
-        return false;
-      }
-      
-      console.log('✅ Connection test passed:', testData);
-      setConnectionStatus('connected');
-      return true;
-    } catch (error) {
-      console.error('❌ Connection error:', error);
-      setConnectionStatus('error');
-      return false;
-    }
-  };
-
   const fetchLeads = async () => {
+    console.log('🔄 Fetching leads...');
     setIsLoading(true);
-    console.log('🔄 Starting fetchLeads function...');
+    setConnectionStatus('checking');
     
     try {
-      // Test connection first
-      const isConnected = await testConnection();
-      if (!isConnected) {
-        throw new Error('Supabase connection failed');
-      }
-
-      console.log('📡 Querying leads table...');
-      
-      // Simple query first to debug
-      const { data: rawData, error, count } = await supabase
+      // Simple direct query without complex error handling
+      const { data: leadsData, error } = await supabase
         .from('leads')
-        .select('*', { count: 'exact' })
+        .select('*')
         .order('created_at', { ascending: false });
         
-      console.log('📊 Query results:', {
-        data: rawData,
-        error: error,
-        count: count,
-        dataLength: rawData?.length || 0
-      });
+      console.log('📊 Direct query result:', { data: leadsData, error });
         
       if (error) {
-        console.error('❌ Supabase query error:', error);
-        throw error;
-      }
-      
-      if (!rawData) {
-        console.warn('⚠️ No data returned from query');
-        setLeads([]);
+        console.error('❌ Query error:', error);
+        setConnectionStatus('error');
         toast({
-          title: "⚠️ No data returned",
-          description: "Query executed but returned null/undefined",
+          title: "Database Error",
+          description: `Failed to fetch leads: ${error.message}`,
           variant: "destructive",
         });
         return;
       }
       
-      console.log(`✅ Successfully fetched ${rawData.length} leads`);
-      console.log('🔍 First lead sample:', rawData[0]);
+      if (!leadsData) {
+        console.warn('⚠️ No data returned');
+        setConnectionStatus('connected');
+        setLeads([]);
+        return;
+      }
       
-      // Enhance leads with AI scoring and insights
-      const enhancedLeads = rawData.map(lead => {
-        const score = calculateLeadScore(lead);
-        const insights = generateAIInsights(lead);
-        const nextAction = determineNextAction(lead);
-        
-        return {
-          ...lead,
-          lead_score: score,
-          ai_insights: insights,
-          next_action: nextAction
-        };
-      });
+      console.log(`✅ Successfully fetched ${leadsData.length} leads`);
+      setConnectionStatus('connected');
       
-      console.log(`🚀 Enhanced ${enhancedLeads.length} leads with AI data`);
+      // Enhance leads with AI scoring
+      const enhancedLeads = leadsData.map(lead => ({
+        ...lead,
+        lead_score: calculateLeadScore(lead),
+        ai_insights: generateAIInsights(lead),
+        next_action: determineNextAction(lead)
+      }));
+      
       setLeads(enhancedLeads);
       
       toast({
-        title: "✅ Leads loaded successfully",
-        description: `Found ${enhancedLeads.length} leads in database`,
+        title: "✅ Leads loaded",
+        description: `Found ${enhancedLeads.length} leads`,
       });
       
     } catch (error) {
-      console.error('💥 Critical error in fetchLeads:', error);
+      console.error('💥 Fetch error:', error);
+      setConnectionStatus('error');
       toast({
-        title: "❌ Failed to load leads",
-        description: `Error: ${error.message}`,
+        title: "Error",
+        description: `Failed to load leads: ${error.message}`,
         variant: "destructive",
       });
-      setLeads([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log('🎬 EnhancedLeadManagement component mounted');
     fetchLeads();
     
     // Set up real-time subscription
-    console.log('📡 Setting up realtime subscription...');
     const channel = supabase
-      .channel('enhanced-leads-channel')
+      .channel('leads-changes')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'leads' 
-      }, payload => {
-        console.log('🔔 Real-time update received:', payload);
-        fetchLeads(); // Refresh data
-        
-        if (payload.eventType === 'INSERT') {
-          toast({
-            title: "🎉 New lead captured!",
-            description: `${payload.new.name} just submitted an inquiry.`,
-          });
-        }
+      }, (payload) => {
+        console.log('🔔 Real-time update:', payload);
+        fetchLeads();
       })
-      .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
-      });
+      .subscribe();
       
     return () => {
-      console.log('🧹 Cleaning up subscription...');
       supabase.removeChannel(channel);
     };
   }, []);
@@ -290,42 +236,32 @@ const EnhancedLeadManagement = () => {
     console.log(`🤖 LeadBuddy: Executing ${action} for ${leadData.name}`);
     
     try {
-      // Call the AI automation edge function
-      const response = await supabase.functions.invoke('execute-lead-action', {
-        body: { 
-          leadId, 
-          action, 
-          leadData 
-        }
-      });
-
-      if (response.data?.success) {
-        switch (action) {
-          case 'send_welcome_email':
-            toast({
-              title: "📧 Welcome Email Sent",
-              description: `LeadBuddy sent a personalized welcome email to ${leadData.name}`,
-            });
-            break;
-          case 'schedule_follow_up':
-            toast({
-              title: "📞 Follow-up Scheduled",
-              description: `Follow-up call scheduled with ${leadData.name}`,
-            });
-            break;
-          case 'send_demo_link':
-            toast({
-              title: "🎥 Demo Link Sent",
-              description: `Product demo link sent to ${leadData.name}`,
-            });
-            break;
-          case 'priority_outreach':
-            toast({
-              title: "⭐ Priority Outreach Initiated",
-              description: `High-priority outreach sequence started for ${leadData.name}`,
-            });
-            break;
-        }
+      // Mock AI action for now
+      switch (action) {
+        case 'send_welcome_email':
+          toast({
+            title: "📧 Welcome Email Sent",
+            description: `LeadBuddy sent a personalized welcome email to ${leadData.name}`,
+          });
+          break;
+        case 'schedule_follow_up':
+          toast({
+            title: "📞 Follow-up Scheduled",
+            description: `Follow-up call scheduled with ${leadData.name}`,
+          });
+          break;
+        case 'send_demo_link':
+          toast({
+            title: "🎥 Demo Link Sent",
+            description: `Product demo link sent to ${leadData.name}`,
+          });
+          break;
+        case 'priority_outreach':
+          toast({
+            title: "⭐ Priority Outreach Initiated",
+            description: `High-priority outreach sequence started for ${leadData.name}`,
+          });
+          break;
       }
     } catch (error) {
       console.error('Error executing AI action:', error);

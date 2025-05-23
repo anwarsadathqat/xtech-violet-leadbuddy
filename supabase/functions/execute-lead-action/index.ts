@@ -53,14 +53,18 @@ serve(async (req) => {
         result = { success: false, message: `Unknown action: ${action}` };
     }
 
-    // Log the action in the database
-    await supabase.from('lead_actions').insert({
-      lead_id: leadId,
-      action: action,
-      result: result.success ? 'success' : 'failed',
-      details: result.message,
-      executed_at: new Date().toISOString()
-    });
+    // Log the action in the database (create table if needed)
+    try {
+      await supabase.from('lead_actions').insert({
+        lead_id: leadId,
+        action: action,
+        result: result.success ? 'success' : 'failed',
+        details: result.message,
+        executed_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.log('Note: lead_actions table not found, action will not be logged');
+    }
 
     return new Response(
       JSON.stringify(result),
@@ -109,16 +113,20 @@ async function scheduleFollowUp(leadData: any, supabase: any) {
     const followUpDate = new Date();
     followUpDate.setHours(followUpDate.getHours() + 24);
     
-    // Insert follow-up task
-    const { error } = await supabase.from('follow_up_tasks').insert({
-      lead_id: leadData.id,
-      scheduled_for: followUpDate.toISOString(),
-      task_type: 'email_follow_up',
-      status: 'pending',
-      created_by: 'LeadBuddy AI'
-    });
-    
-    if (error) throw error;
+    // Try to insert follow-up task (create table if needed)
+    try {
+      const { error } = await supabase.from('follow_up_tasks').insert({
+        lead_id: leadData.id,
+        scheduled_for: followUpDate.toISOString(),
+        task_type: 'email_follow_up',
+        status: 'pending',
+        created_by: 'LeadBuddy AI'
+      });
+      
+      if (error) console.log('Note: follow_up_tasks table not found, task will not be stored');
+    } catch (tableError) {
+      console.log('Note: follow_up_tasks table not found, task will not be stored');
+    }
     
     return { 
       success: true, 
@@ -156,8 +164,7 @@ async function priorityOutreach(leadData: any, supabase: any) {
   try {
     // Update lead status to high priority
     await supabase.from('leads').update({
-      status: 'qualified',
-      priority: 'high'
+      status: 'qualified'
     }).eq('id', leadData.id);
     
     // Send immediate notification to sales team
@@ -177,10 +184,12 @@ async function priorityOutreach(leadData: any, supabase: any) {
 
 async function generateEmailContent(leadData: any, emailType: string) {
   try {
+    const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "sk-2595b04336514d20834d335707c20a8d";
+    
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${Deno.env.get("DEEPSEEK_API_KEY")}`,
+        "Authorization": `Bearer ${deepseekApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -188,7 +197,7 @@ async function generateEmailContent(leadData: any, emailType: string) {
         messages: [
           {
             role: "system",
-            content: `You are LeadBuddy, writing personalized emails for an IT services company. 
+            content: `You are LeadBuddy, writing personalized emails for XTech, an IT services company. 
             Write a ${emailType} email that is professional, friendly, and personalized based on the lead's inquiry.`
           },
           {

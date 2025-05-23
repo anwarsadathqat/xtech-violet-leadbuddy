@@ -29,6 +29,8 @@ serve(async (req) => {
 
     const { message, conversationHistory }: ChatRequest = await req.json();
     
+    console.log(`🤖 LeadBuddy Chat: Processing message: ${message.substring(0, 50)}...`);
+    
     // Get recent leads data for context
     const { data: leads, error: leadsError } = await supabase
       .from('leads')
@@ -54,11 +56,14 @@ serve(async (req) => {
     const conversationContext = conversationHistory ? 
       conversationHistory.map(msg => `${msg.sender}: ${msg.content}`).join('\n') : '';
 
+    // Use the provided DeepSeek API key
+    const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "sk-2595b04336514d20834d335707c20a8d";
+
     // Call DeepSeek API
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${Deno.env.get("DEEPSEEK_API_KEY")}`,
+        "Authorization": `Bearer ${deepseekApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -66,7 +71,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are LeadBuddy, an expert AI assistant for lead management at an IT services company. You are friendly, professional, and helpful.
+            content: `You are LeadBuddy, an expert AI assistant for lead management at XTech, an IT services company. You are friendly, professional, and helpful.
 
             CAPABILITIES:
             - Analyze lead quality and provide scoring insights
@@ -80,7 +85,7 @@ serve(async (req) => {
 
             CONVERSATION HISTORY: ${conversationContext}
 
-            Always be helpful, provide actionable insights, and maintain a professional yet friendly tone. Use emojis sparingly for clarity. Focus on practical, implementable advice.`
+            Always be helpful, provide actionable insights, and maintain a professional yet friendly tone. Use emojis sparingly for clarity. Focus on practical, implementable advice based on the actual lead data provided.`
           },
           {
             role: "user",
@@ -93,13 +98,15 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`DeepSeek API error: ${response.status} - ${errorText}`);
       throw new Error(`DeepSeek API error: ${response.statusText}`);
     }
 
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
 
-    console.log(`🤖 LeadBuddy responded to: ${message.substring(0, 50)}...`);
+    console.log(`✅ LeadBuddy responded successfully to: ${message.substring(0, 50)}...`);
 
     return new Response(
       JSON.stringify({

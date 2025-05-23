@@ -28,7 +28,7 @@ interface Lead {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   inquiry: string | null;
   source: string;
   status: string;
@@ -81,12 +81,19 @@ const EnhancedLeadManagement = () => {
   const fetchLeads = async () => {
     setIsLoading(true);
     try {
+      console.log('🔄 Fetching leads from Supabase...');
+      
       const { data, error } = await supabase
         .from('leads')
         .select('*')
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching leads:', error);
+        throw error;
+      }
+      
+      console.log('✅ Leads fetched successfully:', data?.length || 0, 'leads');
       
       // Enhance leads with AI scoring and insights
       const enhancedLeads = data?.map(lead => ({
@@ -101,7 +108,7 @@ const EnhancedLeadManagement = () => {
       console.error('Error fetching leads:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch leads. Please try again.",
+        description: "Failed to fetch leads. Please check console for details.",
         variant: "destructive",
       });
     } finally {
@@ -221,6 +228,8 @@ const EnhancedLeadManagement = () => {
 
   const updateLeadStatus = async (id: string, newStatus: string) => {
     try {
+      console.log(`🔄 Updating lead ${id} status to ${newStatus}`);
+      
       const { error } = await supabase
         .from('leads')
         .update({ status: newStatus })
@@ -345,7 +354,7 @@ const EnhancedLeadManagement = () => {
                 Enhanced Lead Management
               </CardTitle>
               <CardDescription className="text-gray-400">
-                AI-powered lead scoring and automated lifecycle management
+                AI-powered lead scoring and automated lifecycle management • {leads.length} total leads
               </CardDescription>
             </div>
             
@@ -393,6 +402,18 @@ const EnhancedLeadManagement = () => {
           {isLoading ? (
             <div className="flex justify-center items-center p-8">
               <div className="w-8 h-8 border-t-2 border-b-2 border-xtech-blue rounded-full animate-spin"></div>
+              <span className="ml-3 text-white">Loading leads from Supabase...</span>
+            </div>
+          ) : filteredLeads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <Users size={48} className="text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-white mb-2">No leads found</h3>
+              <p className="text-gray-400">
+                {leads.length === 0 
+                  ? "No leads have been captured yet. Check your Supabase connection."
+                  : `${leads.length} total leads, but none match your current filters.`
+                }
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -408,112 +429,112 @@ const EnhancedLeadManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLeads.length > 0 ? (
-                    filteredLeads.map((lead) => (
-                      <TableRow 
-                        key={lead.id}
-                        className="hover:bg-white/5 border-b border-white/10"
-                      >
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium text-white">{lead.name}</div>
-                            <div className="text-sm text-gray-400">{lead.email}</div>
-                            <div className="text-xs text-gray-500">
-                              {lead.source} • {formatDate(lead.created_at)}
-                            </div>
+                  {filteredLeads.map((lead) => (
+                    <TableRow 
+                      key={lead.id}
+                      className="hover:bg-white/5 border-b border-white/10"
+                    >
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="font-medium text-white">{lead.name}</div>
+                          <div className="text-sm text-gray-400">{lead.email}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-2">
+                            <span>{lead.source}</span>
+                            <span>•</span>
+                            <span>{formatDate(lead.created_at)}</span>
+                            {lead.phone && (
+                              <>
+                                <span>•</span>
+                                <span>{lead.phone}</span>
+                              </>
+                            )}
                           </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className={`text-lg font-bold ${getScoreColor(lead.lead_score || 0)}`}>
-                              {lead.lead_score || 0}
-                            </div>
-                            <Progress 
-                              value={lead.lead_score || 0} 
-                              className="w-16 h-2"
-                            />
-                            {(lead.lead_score || 0) > 80 && <Star size={16} className="text-yellow-400" />}
+                        </div>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className={`text-lg font-bold ${getScoreColor(lead.lead_score || 0)}`}>
+                            {lead.lead_score || 0}
                           </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <LeadStatusBadge status={lead.status} />
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="max-w-xs">
-                            <div className="flex items-start gap-2">
-                              <Bot size={14} className="text-purple-400 mt-1 flex-shrink-0" />
-                              <span className="text-sm text-gray-300 truncate">
-                                {lead.ai_insights}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock size={14} className="text-blue-400" />
-                            <span className="text-sm text-gray-300">
-                              {lead.next_action}
+                          <Progress 
+                            value={lead.lead_score || 0} 
+                            className="w-16 h-2"
+                          />
+                          {(lead.lead_score || 0) > 80 && <Star size={16} className="text-yellow-400" />}
+                        </div>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <LeadStatusBadge status={lead.status} />
+                      </TableCell>
+                      
+                      <TableCell>
+                        <div className="max-w-xs">
+                          <div className="flex items-start gap-2">
+                            <Bot size={14} className="text-purple-400 mt-1 flex-shrink-0" />
+                            <span className="text-sm text-gray-300 truncate">
+                              {lead.ai_insights}
                             </span>
                           </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                              onClick={() => executeAIAction(lead.id, 'send_welcome_email')}
-                            >
-                              <Mail size={14} />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                              onClick={() => executeAIAction(lead.id, 'schedule_follow_up')}
-                            >
-                              <Phone size={14} />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                              onClick={() => executeAIAction(lead.id, 'send_demo_link')}
-                            >
-                              <Eye size={14} />
-                            </Button>
-                            
-                            <Select 
-                              value={lead.status} 
-                              onValueChange={(value) => updateLeadStatus(lead.id, value)}
-                            >
-                              <SelectTrigger className="w-[100px] h-8 text-xs bg-white/10 border-white/20 text-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="new">New</SelectItem>
-                                <SelectItem value="contacted">Contacted</SelectItem>
-                                <SelectItem value="qualified">Qualified</SelectItem>
-                                <SelectItem value="converted">Converted</SelectItem>
-                                <SelectItem value="lost">Lost</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-gray-400">
-                        No leads found
+                        </div>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Clock size={14} className="text-blue-400" />
+                          <span className="text-sm text-gray-300">
+                            {lead.next_action}
+                          </span>
+                        </div>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
+                            onClick={() => executeAIAction(lead.id, 'send_welcome_email')}
+                          >
+                            <Mail size={14} />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
+                            onClick={() => executeAIAction(lead.id, 'schedule_follow_up')}
+                          >
+                            <Phone size={14} />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
+                            onClick={() => executeAIAction(lead.id, 'send_demo_link')}
+                          >
+                            <Eye size={14} />
+                          </Button>
+                          
+                          <Select 
+                            value={lead.status} 
+                            onValueChange={(value) => updateLeadStatus(lead.id, value)}
+                          >
+                            <SelectTrigger className="w-[100px] h-8 text-xs bg-white/10 border-white/20 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="new">New</SelectItem>
+                              <SelectItem value="contacted">Contacted</SelectItem>
+                              <SelectItem value="qualified">Qualified</SelectItem>
+                              <SelectItem value="converted">Converted</SelectItem>
+                              <SelectItem value="lost">Lost</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </div>

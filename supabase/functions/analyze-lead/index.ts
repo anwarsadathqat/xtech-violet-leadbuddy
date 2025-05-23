@@ -27,11 +27,16 @@ serve(async (req) => {
   try {
     const { lead }: LeadAnalysisRequest = await req.json();
     
+    console.log(`🔍 Analyzing lead: ${lead.name} (${lead.email})`);
+    
+    // Use the provided DeepSeek API key
+    const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "sk-2595b04336514d20834d335707c20a8d";
+    
     // DeepSeek API call for lead analysis
     const deepseekResponse = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${Deno.env.get("DEEPSEEK_API_KEY")}`,
+        "Authorization": `Bearer ${deepseekApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -39,7 +44,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are LeadBuddy, an AI lead analyst for an IT services company. Analyze the lead and provide:
+            content: `You are LeadBuddy, an AI lead analyst for XTech, an IT services company. Analyze the lead and provide:
             1. A lead score (0-100)
             2. Key insights about the lead's potential
             3. Recommended next action
@@ -70,13 +75,27 @@ serve(async (req) => {
     });
 
     if (!deepseekResponse.ok) {
+      const errorText = await deepseekResponse.text();
+      console.error(`DeepSeek API error: ${deepseekResponse.status} - ${errorText}`);
       throw new Error(`DeepSeek API error: ${deepseekResponse.statusText}`);
     }
 
     const deepseekData = await deepseekResponse.json();
-    const analysis = JSON.parse(deepseekData.choices[0].message.content);
+    
+    let analysis;
+    try {
+      analysis = JSON.parse(deepseekData.choices[0].message.content);
+    } catch (parseError) {
+      console.error('Error parsing DeepSeek response:', parseError);
+      // Fallback to manual scoring
+      analysis = {
+        score: calculateFallbackScore(lead),
+        insights: "Lead analyzed using fallback scoring. AI analysis temporarily unavailable.",
+        recommendedAction: "send_welcome_email"
+      };
+    }
 
-    console.log(`🤖 LeadBuddy analyzed lead ${lead.name}: Score ${analysis.score}/100`);
+    console.log(`✅ Lead ${lead.name} analyzed: Score ${analysis.score}/100`);
 
     return new Response(
       JSON.stringify({
@@ -112,14 +131,10 @@ serve(async (req) => {
   }
 });
 
-function calculateFallbackScore(req: any): number {
-  // Simple fallback scoring logic
+function calculateFallbackScore(lead: any): number {
   let score = 50;
   
   try {
-    const body = req.json();
-    const lead = body.lead;
-    
     // Email domain scoring
     if (lead.email?.includes('.gov') || lead.email?.includes('.edu')) score += 20;
     if (lead.email?.includes('company.com') || lead.email?.includes('corp.com')) score += 15;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -46,32 +45,83 @@ const EnhancedLeadManagement = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [scoreFilter, setScoreFilter] = useState<string>('all');
+  const [connectionStatus, setConnectionStatus] = useState<string>('checking');
+
+  const testConnection = async () => {
+    console.log('🔗 Testing Supabase connection...');
+    try {
+      // Test basic connection
+      const { data: testData, error: testError } = await supabase
+        .from('leads')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Connection test failed:', testError);
+        setConnectionStatus('failed');
+        return false;
+      }
+      
+      console.log('✅ Connection test passed:', testData);
+      setConnectionStatus('connected');
+      return true;
+    } catch (error) {
+      console.error('❌ Connection error:', error);
+      setConnectionStatus('error');
+      return false;
+    }
+  };
 
   const fetchLeads = async () => {
     setIsLoading(true);
+    console.log('🔄 Starting fetchLeads function...');
+    
     try {
-      console.log('🔄 Fetching leads from Supabase...');
+      // Test connection first
+      const isConnected = await testConnection();
+      if (!isConnected) {
+        throw new Error('Supabase connection failed');
+      }
+
+      console.log('📡 Querying leads table...');
       
-      const { data, error } = await supabase
+      // Simple query first to debug
+      const { data: rawData, error, count } = await supabase
         .from('leads')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
         
+      console.log('📊 Query results:', {
+        data: rawData,
+        error: error,
+        count: count,
+        dataLength: rawData?.length || 0
+      });
+        
       if (error) {
-        console.error('❌ Error fetching leads:', error);
+        console.error('❌ Supabase query error:', error);
         throw error;
       }
       
-      console.log('✅ Raw Supabase data:', data);
-      console.log('✅ Number of leads fetched:', data?.length || 0);
+      if (!rawData) {
+        console.warn('⚠️ No data returned from query');
+        setLeads([]);
+        toast({
+          title: "⚠️ No data returned",
+          description: "Query executed but returned null/undefined",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log(`✅ Successfully fetched ${rawData.length} leads`);
+      console.log('🔍 First lead sample:', rawData[0]);
       
       // Enhance leads with AI scoring and insights
-      const enhancedLeads = data?.map(lead => {
+      const enhancedLeads = rawData.map(lead => {
         const score = calculateLeadScore(lead);
         const insights = generateAIInsights(lead);
         const nextAction = determineNextAction(lead);
-        
-        console.log(`🤖 Enhanced lead ${lead.name}: score=${score}, insights=${insights}`);
         
         return {
           ...lead,
@@ -79,102 +129,61 @@ const EnhancedLeadManagement = () => {
           ai_insights: insights,
           next_action: nextAction
         };
-      }) || [];
+      });
       
-      console.log('✅ Enhanced leads:', enhancedLeads);
+      console.log(`🚀 Enhanced ${enhancedLeads.length} leads with AI data`);
       setLeads(enhancedLeads);
       
-      if (enhancedLeads.length > 0) {
-        toast({
-          title: "✅ Leads loaded successfully",
-          description: `Found ${enhancedLeads.length} leads in database`,
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error fetching leads:', error);
       toast({
-        title: "Error fetching leads",
-        description: `Database error: ${error.message}`,
+        title: "✅ Leads loaded successfully",
+        description: `Found ${enhancedLeads.length} leads in database`,
+      });
+      
+    } catch (error) {
+      console.error('💥 Critical error in fetchLeads:', error);
+      toast({
+        title: "❌ Failed to load leads",
+        description: `Error: ${error.message}`,
         variant: "destructive",
       });
+      setLeads([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log('🚀 Component mounted, fetching leads...');
+    console.log('🎬 EnhancedLeadManagement component mounted');
     fetchLeads();
     
     // Set up real-time subscription
+    console.log('📡 Setting up realtime subscription...');
     const channel = supabase
-      .channel('enhanced-leads')
+      .channel('enhanced-leads-channel')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'leads' 
       }, payload => {
-        console.log('🔔 Real-time update:', payload);
+        console.log('🔔 Real-time update received:', payload);
         fetchLeads(); // Refresh data
         
         if (payload.eventType === 'INSERT') {
           toast({
             title: "🎉 New lead captured!",
-            description: `${payload.new.name} just submitted an inquiry. LeadBuddy is processing...`,
+            description: `${payload.new.name} just submitted an inquiry.`,
           });
-          
-          // Trigger AI processing
-          setTimeout(() => processNewLead(payload.new), 2000);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+      });
       
     return () => {
+      console.log('🧹 Cleaning up subscription...');
       supabase.removeChannel(channel);
     };
   }, []);
-
-  const processNewLead = async (newLead: any) => {
-    console.log('🤖 LeadBuddy: Processing new lead...', newLead.name);
-    
-    try {
-      // Call DeepSeek AI to analyze the lead
-      const response = await supabase.functions.invoke('analyze-lead', {
-        body: { lead: newLead }
-      });
-
-      if (response.data) {
-        const { score, insights, recommendedAction } = response.data;
-        
-        toast({
-          title: "🤖 LeadBuddy Analysis Complete",
-          description: `Lead score: ${score}/100. ${insights}`,
-        });
-        
-        // Auto-assign status based on score
-        if (score > 80) {
-          await updateLeadStatus(newLead.id, 'qualified');
-          toast({
-            title: "⭐ High-value lead detected!",
-            description: `${newLead.name} has been automatically qualified for priority follow-up.`,
-          });
-        }
-
-        // Execute recommended action
-        await executeAIAction(newLead.id, recommendedAction, newLead);
-      }
-    } catch (error) {
-      console.error('Error processing lead with AI:', error);
-      // Fallback to local scoring
-      const score = calculateLeadScore(newLead);
-      const insights = generateAIInsights(newLead);
-      
-      toast({
-        title: "🤖 LeadBuddy Analysis Complete",
-        description: `Lead score: ${score}/100. ${insights}`,
-      });
-    }
-  };
 
   const calculateLeadScore = (lead: any) => {
     let score = 50; // Base score
@@ -362,7 +371,7 @@ const EnhancedLeadManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header with Filters */}
+      {/* Enhanced Header with Debug Info */}
       <Card className="bg-white/5 border-white/10">
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
@@ -370,15 +379,20 @@ const EnhancedLeadManagement = () => {
               <CardTitle className="text-white flex items-center gap-2">
                 <Users size={24} />
                 Enhanced Lead Management
+                <Badge variant={connectionStatus === 'connected' ? 'default' : 'destructive'}>
+                  {connectionStatus}
+                </Badge>
               </CardTitle>
               <CardDescription className="text-gray-400">
                 AI-powered lead scoring and automated lifecycle management • {leads.length} total leads
-                {leads.length === 0 && (
-                  <span className="block text-red-400 text-sm mt-1">
-                    Debug: No leads found in database. Check Supabase connection.
-                  </span>
-                )}
               </CardDescription>
+              <div className="mt-2 text-sm">
+                <p className="text-blue-400">🔍 Debug Info:</p>
+                <p className="text-gray-400">• Connection: {connectionStatus}</p>
+                <p className="text-gray-400">• Raw leads fetched: {leads.length}</p>
+                <p className="text-gray-400">• Filtered results: {filteredLeads.length}</p>
+                <p className="text-gray-400">• Loading state: {isLoading ? 'true' : 'false'}</p>
+              </div>
             </div>
             
             <div className="flex flex-col md:flex-row gap-4">
@@ -389,7 +403,7 @@ const EnhancedLeadManagement = () => {
                 disabled={isLoading}
               >
                 <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                Refresh
+                Force Refresh
               </Button>
               
               <Input
@@ -443,7 +457,7 @@ const EnhancedLeadManagement = () => {
               <h3 className="text-lg font-medium text-white mb-2">No leads found</h3>
               <p className="text-gray-400 mb-4">
                 {leads.length === 0 
-                  ? "No leads have been captured yet. Database appears empty."
+                  ? "No leads fetched from database despite test data being present."
                   : `${leads.length} total leads, but none match your current filters.`
                 }
               </p>
@@ -453,11 +467,11 @@ const EnhancedLeadManagement = () => {
                 className="border-white/20 hover:bg-white/10 text-white"
               >
                 <RefreshCw size={16} className="mr-2" />
-                Try Refresh
+                Try Force Refresh
               </Button>
               <div className="mt-4 text-sm text-gray-500">
-                <p>Debug info: Fetched {leads.length} leads from Supabase</p>
-                <p>Applied filters: Status={statusFilter}, Score={scoreFilter}</p>
+                <p>Status: {connectionStatus} | Fetched: {leads.length} leads</p>
+                <p>Filters: Status={statusFilter}, Score={scoreFilter}</p>
               </div>
             </div>
           ) : (

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { 
   Calendar, Phone, Mail, Bot, TrendingUp, Users, 
-  DollarSign, Star, Clock, Eye, MessageSquare, RefreshCw
+  DollarSign, Star, Clock, Eye, MessageSquare, RefreshCw, Loader2
 } from 'lucide-react';
 import LeadStatusBadge from './LeadStatusBadge';
 
@@ -46,6 +46,7 @@ const EnhancedLeadManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [scoreFilter, setScoreFilter] = useState<string>('all');
   const [connectionStatus, setConnectionStatus] = useState<string>('checking');
+  const [executingActions, setExecutingActions] = useState<Set<string>>(new Set());
 
   const fetchLeads = async () => {
     console.log('🔄 Fetching leads...');
@@ -231,44 +232,92 @@ const EnhancedLeadManagement = () => {
 
   const executeAIAction = async (leadId: string, action: string, lead?: any) => {
     const leadData = lead || leads.find(l => l.id === leadId);
-    if (!leadData) return;
+    if (!leadData) {
+      toast({
+        title: "Error",
+        description: "Lead not found",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const actionKey = `${leadId}-${action}`;
+    setExecutingActions(prev => new Set([...prev, actionKey]));
     
     console.log(`🤖 LeadBuddy: Executing ${action} for ${leadData.name}`);
     
     try {
-      // Mock AI action for now
+      // Call the actual edge function to execute the action
+      const { data, error } = await supabase.functions.invoke('execute-lead-action', {
+        body: {
+          leadId: leadId,
+          action: action,
+          leadData: {
+            id: leadData.id,
+            name: leadData.name,
+            email: leadData.email,
+            phone: leadData.phone || 'Not provided',
+            inquiry: leadData.inquiry || 'General inquiry',
+            source: leadData.source
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`Failed to execute ${action}: ${error.message}`);
+      }
+
+      console.log('✅ Action executed successfully:', data);
+
+      // Show success message based on action type
+      let successMessage = '';
       switch (action) {
         case 'send_welcome_email':
-          toast({
-            title: "📧 Welcome Email Sent",
-            description: `LeadBuddy sent a personalized welcome email to ${leadData.name}`,
-          });
+        case 'welcome_email':
+          successMessage = `📧 Welcome email sent to ${leadData.name} at ${leadData.email}`;
+          // Update lead status to contacted
+          await updateLeadStatus(leadId, 'contacted');
           break;
         case 'schedule_follow_up':
-          toast({
-            title: "📞 Follow-up Scheduled",
-            description: `Follow-up call scheduled with ${leadData.name}`,
-          });
+        case 'follow_up_email':
+          successMessage = `📞 Follow-up scheduled and email sent to ${leadData.name}`;
           break;
         case 'send_demo_link':
-          toast({
-            title: "🎥 Demo Link Sent",
-            description: `Product demo link sent to ${leadData.name}`,
-          });
+        case 'demo_scheduler':
+          successMessage = `🎥 Demo link sent to ${leadData.name} at ${leadData.email}`;
           break;
         case 'priority_outreach':
-          toast({
-            title: "⭐ Priority Outreach Initiated",
-            description: `High-priority outreach sequence started for ${leadData.name}`,
-          });
+          successMessage = `⭐ Priority outreach initiated for ${leadData.name}`;
+          // Update lead status to qualified
+          await updateLeadStatus(leadId, 'qualified');
           break;
+        default:
+          successMessage = `✅ Action ${action} completed for ${leadData.name}`;
       }
+
+      toast({
+        title: "🤖 LeadBuddy Action Complete",
+        description: successMessage,
+      });
+
+      // If there's email content in the response, log it
+      if (data.emailContent || data.demoContent) {
+        console.log('📧 Email content preview:', data.emailContent || data.demoContent);
+      }
+
     } catch (error) {
       console.error('Error executing AI action:', error);
       toast({
-        title: "Error",
-        description: "Failed to execute AI action. Please try again.",
+        title: "❌ Action Failed",
+        description: `Failed to execute ${action} for ${leadData.name}: ${error.message}`,
         variant: "destructive",
+      });
+    } finally {
+      setExecutingActions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(actionKey);
+        return newSet;
       });
     }
   };
@@ -490,25 +539,43 @@ const EnhancedLeadManagement = () => {
                             size="sm" 
                             variant="outline"
                             className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                            onClick={() => executeAIAction(lead.id, 'send_welcome_email')}
+                            onClick={() => executeAIAction(lead.id, 'send_welcome_email', lead)}
+                            disabled={executingActions.has(`${lead.id}-send_welcome_email`)}
+                            title="Send Welcome Email"
                           >
-                            <Mail size={14} />
+                            {executingActions.has(`${lead.id}-send_welcome_email`) ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Mail size={14} />
+                            )}
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
                             className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                            onClick={() => executeAIAction(lead.id, 'schedule_follow_up')}
+                            onClick={() => executeAIAction(lead.id, 'schedule_follow_up', lead)}
+                            disabled={executingActions.has(`${lead.id}-schedule_follow_up`)}
+                            title="Schedule Follow-up"
                           >
-                            <Phone size={14} />
+                            {executingActions.has(`${lead.id}-schedule_follow_up`) ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Phone size={14} />
+                            )}
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
                             className="h-8 w-8 p-0 border-white/20 hover:bg-white/10"
-                            onClick={() => executeAIAction(lead.id, 'send_demo_link')}
+                            onClick={() => executeAIAction(lead.id, 'send_demo_link', lead)}
+                            disabled={executingActions.has(`${lead.id}-send_demo_link`)}
+                            title="Send Demo Link"
                           >
-                            <Eye size={14} />
+                            {executingActions.has(`${lead.id}-send_demo_link`) ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Eye size={14} />
+                            )}
                           </Button>
                           
                           <Select 

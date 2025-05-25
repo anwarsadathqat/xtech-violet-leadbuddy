@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, Users, DollarSign, Bot, Mail, Phone, 
-  Calendar, Target, Award, Zap, RefreshCw, Download, Eye
+  Calendar, Target, Award, Zap, RefreshCw, Download, Eye, Clock
 } from 'lucide-react';
 
 interface AnalyticsData {

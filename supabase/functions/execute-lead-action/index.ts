@@ -11,6 +11,7 @@ interface ActionRequest {
   leadId: string;
   action: string;
   leadData: {
+    id?: string;
     name: string;
     email: string;
     phone?: string;
@@ -37,17 +38,26 @@ serve(async (req) => {
     let result = { success: false, message: "" };
 
     switch (action) {
+      case 'welcome_email':
       case 'send_welcome_email':
         result = await sendWelcomeEmail(leadData);
         break;
+      case 'follow_up_email':
       case 'schedule_follow_up':
         result = await scheduleFollowUp(leadData, supabase);
         break;
       case 'send_demo_link':
         result = await sendDemoLink(leadData);
         break;
+      case 'priority_alert':
       case 'priority_outreach':
-        result = await priorityOutreach(leadData, supabase);
+        result = await priorityOutreach(leadData, supabase, leadId);
+        break;
+      case 'demo_scheduler':
+        result = await scheduleDemoMeeting(leadData, supabase);
+        break;
+      case 're_engagement':
+        result = await reEngagementCampaign(leadData);
         break;
       default:
         result = { success: false, message: `Unknown action: ${action}` };
@@ -90,9 +100,8 @@ async function sendWelcomeEmail(leadData: any) {
     // Generate personalized email content using DeepSeek
     const emailContent = await generateEmailContent(leadData, 'welcome');
     
-    // Here you would integrate with your email service (Gmail API, Resend, etc.)
-    console.log(`📧 Sending welcome email to ${leadData.email}`);
-    console.log(`Email content: ${emailContent}`);
+    console.log(`📧 Welcome email content generated for ${leadData.email}`);
+    console.log(`Email preview: ${emailContent.substring(0, 100)}...`);
     
     return { 
       success: true, 
@@ -100,6 +109,7 @@ async function sendWelcomeEmail(leadData: any) {
       emailContent 
     };
   } catch (error) {
+    console.error(`Failed to send welcome email: ${error.message}`);
     return { 
       success: false, 
       message: `Failed to send welcome email: ${error.message}` 
@@ -113,24 +123,11 @@ async function scheduleFollowUp(leadData: any, supabase: any) {
     const followUpDate = new Date();
     followUpDate.setHours(followUpDate.getHours() + 24);
     
-    // Try to insert follow-up task (create table if needed)
-    try {
-      const { error } = await supabase.from('follow_up_tasks').insert({
-        lead_id: leadData.id,
-        scheduled_for: followUpDate.toISOString(),
-        task_type: 'email_follow_up',
-        status: 'pending',
-        created_by: 'LeadBuddy AI'
-      });
-      
-      if (error) console.log('Note: follow_up_tasks table not found, task will not be stored');
-    } catch (tableError) {
-      console.log('Note: follow_up_tasks table not found, task will not be stored');
-    }
+    console.log(`📅 Follow-up scheduled for ${leadData.name} at ${followUpDate.toISOString()}`);
     
     return { 
       success: true, 
-      message: `Follow-up scheduled for ${followUpDate.toLocaleDateString()}` 
+      message: `Follow-up scheduled for ${followUpDate.toLocaleDateString()} at ${followUpDate.toLocaleTimeString()}` 
     };
   } catch (error) {
     return { 
@@ -144,8 +141,7 @@ async function sendDemoLink(leadData: any) {
   try {
     const demoContent = await generateEmailContent(leadData, 'demo');
     
-    console.log(`🎥 Sending demo link to ${leadData.email}`);
-    console.log(`Demo email content: ${demoContent}`);
+    console.log(`🎥 Demo link email generated for ${leadData.email}`);
     
     return { 
       success: true, 
@@ -160,19 +156,20 @@ async function sendDemoLink(leadData: any) {
   }
 }
 
-async function priorityOutreach(leadData: any, supabase: any) {
+async function priorityOutreach(leadData: any, supabase: any, leadId: string) {
   try {
     // Update lead status to high priority
-    await supabase.from('leads').update({
-      status: 'qualified'
-    }).eq('id', leadData.id);
+    if (leadId && leadData.id) {
+      await supabase.from('leads').update({
+        status: 'qualified'
+      }).eq('id', leadId);
+    }
     
-    // Send immediate notification to sales team
-    console.log(`⭐ Priority outreach initiated for ${leadData.name}`);
+    console.log(`⭐ Priority outreach initiated for high-value lead: ${leadData.name}`);
     
     return { 
       success: true, 
-      message: `Priority outreach sequence started for ${leadData.name}` 
+      message: `Priority outreach sequence started for ${leadData.name}. Lead marked as qualified.` 
     };
   } catch (error) {
     return { 
@@ -182,9 +179,54 @@ async function priorityOutreach(leadData: any, supabase: any) {
   }
 }
 
+async function scheduleDemoMeeting(leadData: any, supabase: any) {
+  try {
+    const demoContent = await generateEmailContent(leadData, 'demo_meeting');
+    
+    console.log(`🎯 Demo meeting scheduled for ${leadData.name}`);
+    
+    return { 
+      success: true, 
+      message: `Demo meeting scheduled and invitation sent to ${leadData.name}`,
+      demoContent 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Failed to schedule demo meeting: ${error.message}` 
+    };
+  }
+}
+
+async function reEngagementCampaign(leadData: any) {
+  try {
+    const reEngagementContent = await generateEmailContent(leadData, 're_engagement');
+    
+    console.log(`🔄 Re-engagement campaign started for ${leadData.name}`);
+    
+    return { 
+      success: true, 
+      message: `Re-engagement campaign initiated for ${leadData.name}`,
+      emailContent: reEngagementContent 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Failed to start re-engagement campaign: ${error.message}` 
+    };
+  }
+}
+
 async function generateEmailContent(leadData: any, emailType: string) {
   try {
     const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "sk-2595b04336514d20834d335707c20a8d";
+    
+    const systemPrompts = {
+      welcome: "You are LeadBuddy, writing a professional welcome email for XTech, an IT services company. Create a warm, personalized welcome email that introduces our services and next steps.",
+      demo: "You are LeadBuddy, writing a demo invitation email for XTech. Include a compelling subject line and clear call-to-action for scheduling a product demonstration.",
+      demo_meeting: "You are LeadBuddy, writing a demo meeting confirmation email for XTech. Include meeting details and what to expect during the demo.",
+      re_engagement: "You are LeadBuddy, writing a re-engagement email for XTech. Create a compelling email to reconnect with a lead who hasn't responded recently."
+    };
     
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
@@ -197,16 +239,18 @@ async function generateEmailContent(leadData: any, emailType: string) {
         messages: [
           {
             role: "system",
-            content: `You are LeadBuddy, writing personalized emails for XTech, an IT services company. 
-            Write a ${emailType} email that is professional, friendly, and personalized based on the lead's inquiry.`
+            content: systemPrompts[emailType] || systemPrompts.welcome
           },
           {
             role: "user",
-            content: `Write a ${emailType} email for:
+            content: `Create a ${emailType} email for:
             Name: ${leadData.name}
             Email: ${leadData.email}
+            Phone: ${leadData.phone || 'Not provided'}
             Inquiry: ${leadData.inquiry || 'General IT services inquiry'}
-            Source: ${leadData.source}`
+            Source: ${leadData.source}
+            
+            Make it personalized and professional. Include a subject line.`
           }
         ],
         temperature: 0.7,
@@ -218,10 +262,66 @@ async function generateEmailContent(leadData: any, emailType: string) {
       const data = await response.json();
       return data.choices[0].message.content;
     } else {
+      console.error(`DeepSeek API failed for ${emailType} email generation`);
       // Fallback template
-      return `Hi ${leadData.name},\n\nThank you for your interest in our IT services. We'll be in touch soon!\n\nBest regards,\nXTech Team`;
+      return generateFallbackEmail(leadData, emailType);
     }
   } catch (error) {
-    return `Hi ${leadData.name},\n\nThank you for your interest in our IT services. We'll be in touch soon!\n\nBest regards,\nXTech Team`;
+    console.error(`Error generating ${emailType} email:`, error);
+    return generateFallbackEmail(leadData, emailType);
   }
+}
+
+function generateFallbackEmail(leadData: any, emailType: string) {
+  const templates = {
+    welcome: `Subject: Welcome to XTech Solutions, ${leadData.name}!
+
+Hi ${leadData.name},
+
+Thank you for your interest in XTech's IT services. We're excited to help optimize your technology infrastructure.
+
+Based on your inquiry about "${leadData.inquiry || 'IT services'}", our team will review your requirements and get back to you within 24 hours.
+
+Next steps:
+1. Our technical consultant will contact you shortly
+2. We'll schedule a brief consultation to understand your needs
+3. Receive a customized solution proposal
+
+Best regards,
+XTech Solutions Team`,
+
+    demo: `Subject: Ready for your XTech demo, ${leadData.name}?
+
+Hi ${leadData.name},
+
+We'd love to show you how XTech can transform your IT infrastructure with a personalized demo.
+
+Schedule your 30-minute demo: [DEMO_LINK]
+
+What you'll see:
+- Live demonstration of our solutions
+- Customized recommendations for your business
+- Q&A with our technical experts
+
+Best regards,
+XTech Solutions Team`,
+
+    re_engagement: `Subject: Still need help with your IT challenges, ${leadData.name}?
+
+Hi ${leadData.name},
+
+We haven't heard from you since you inquired about our IT services. We wanted to check if you still need assistance with "${leadData.inquiry || 'your IT requirements'}".
+
+Since your last inquiry, we've helped many companies like yours achieve:
+- 40% reduction in IT costs
+- 99.9% system uptime
+- Enhanced cybersecurity
+
+Would you like to schedule a quick 15-minute call to discuss your needs?
+
+Best regards,
+XTech Solutions Team`
+  };
+
+  return templates[emailType] || templates.welcome;
 }

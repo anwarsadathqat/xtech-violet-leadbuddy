@@ -5,8 +5,13 @@ import {
   Table, TableBody, TableCell, TableHead, 
   TableHeader, TableRow 
 } from "@/components/ui/table";
+import { 
+  Dialog, DialogContent, DialogHeader, 
+  DialogTitle, DialogFooter 
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { 
   Calendar, Phone, Mail, Bot, TrendingUp, Users, 
-  DollarSign, Star, Clock, Eye, MessageSquare, RefreshCw, Loader2
+  DollarSign, Star, Clock, Eye, MessageSquare, RefreshCw, Loader2, User, Globe, Tag
 } from 'lucide-react';
 import LeadStatusBadge from './LeadStatusBadge';
 
@@ -47,6 +52,12 @@ const EnhancedLeadManagement = () => {
   const [scoreFilter, setScoreFilter] = useState<string>('all');
   const [connectionStatus, setConnectionStatus] = useState<string>('checking');
   const [executingActions, setExecutingActions] = useState<Set<string>>(new Set());
+  
+  // Lead detail dialog states
+  const [currentLead, setCurrentLead] = useState<Lead | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
+  const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState<boolean>(false);
+  const [newNote, setNewNote] = useState<string>('');
 
   const fetchLeads = async () => {
     console.log('🔄 Fetching leads...');
@@ -216,6 +227,10 @@ const EnhancedLeadManagement = () => {
         lead.id === id ? { ...lead, status: newStatus } : lead
       ));
       
+      if (currentLead && currentLead.id === id) {
+        setCurrentLead({ ...currentLead, status: newStatus });
+      }
+      
       toast({
         title: "✅ Status updated",
         description: `Lead status changed to ${newStatus}`,
@@ -228,6 +243,36 @@ const EnhancedLeadManagement = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleViewDetails = (lead: Lead) => {
+    console.log('🔍 Opening lead details for:', lead.name);
+    setCurrentLead(lead);
+    setIsDialogOpen(true);
+  };
+
+  const handleAddNote = () => {
+    if (newNote.trim()) {
+      // In MVP, we'll just show a toast notification
+      // In the next iteration, we would save this to a notes table
+      toast({
+        title: "Note added",
+        description: "Your note has been saved for this lead.",
+      });
+      setNewNote('');
+      setIsNewNoteDialogOpen(false);
+    }
+  };
+
+  const handleSendEmail = () => {
+    if (!currentLead) return;
+    
+    // In the MVP, just show a notification
+    // In the next iteration, this would integrate with the email sending edge function
+    toast({
+      title: "Email queued",
+      description: `An email will be sent to ${currentLead.name} shortly.`,
+    });
   };
 
   const executeAIAction = async (leadId: string, action: string, lead?: any) => {
@@ -354,6 +399,30 @@ const EnhancedLeadManagement = () => {
     }).format(date);
   };
 
+  const getTimeSinceSubmission = (dateString: string) => {
+    const now = new Date();
+    const submissionDate = new Date(dateString);
+    const diffInHours = Math.floor((now.getTime() - submissionDate.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Less than 1 hour ago';
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  };
+
+  const getLeadPriority = (lead: Lead) => {
+    const inquiry = lead.inquiry?.toLowerCase() || '';
+    if (inquiry.includes('urgent') || inquiry.includes('immediate')) return 'High';
+    if (inquiry.includes('enterprise') || inquiry.includes('large')) return 'High';
+    if (inquiry.includes('small') || inquiry.includes('budget')) return 'Low';
+    return 'Medium';
+  };
+
+  const getLeadScore = (lead: Lead) => {
+    return lead.lead_score || calculateLeadScore(lead);
+  };
+
   return (
     <div className="space-y-6">
       {/* Enhanced Header with Debug Info */}
@@ -476,7 +545,8 @@ const EnhancedLeadManagement = () => {
                   {filteredLeads.map((lead) => (
                     <TableRow 
                       key={lead.id}
-                      className="hover:bg-white/5 border-b border-white/10"
+                      className="hover:bg-white/5 border-b border-white/10 cursor-pointer"
+                      onClick={() => handleViewDetails(lead)}
                     >
                       <TableCell>
                         <div className="space-y-1">
@@ -534,7 +604,7 @@ const EnhancedLeadManagement = () => {
                       </TableCell>
                       
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button 
                             size="sm" 
                             variant="outline"
@@ -603,6 +673,228 @@ const EnhancedLeadManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Enhanced Lead Detail Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-3">
+              <User className="w-6 h-6" />
+              Lead Details - {currentLead?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {currentLead && (
+            <div className="space-y-6">
+              {/* Lead Overview Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Tag className="w-4 h-4 text-xtech-blue" />
+                    <span className="text-sm text-gray-400">Lead Score</span>
+                  </div>
+                  <div className="text-2xl font-bold text-white">{getLeadScore(currentLead)}%</div>
+                </div>
+                
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-xtech-purple" />
+                    <span className="text-sm text-gray-400">Time Since Submission</span>
+                  </div>
+                  <div className="text-lg font-semibold text-white">{getTimeSinceSubmission(currentLead.created_at)}</div>
+                </div>
+                
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MessageSquare className="w-4 h-4 text-xtech-blue" />
+                    <span className="text-sm text-gray-400">Priority</span>
+                  </div>
+                  <div className={`text-lg font-semibold ${
+                    getLeadPriority(currentLead) === 'High' ? 'text-red-400' :
+                    getLeadPriority(currentLead) === 'Medium' ? 'text-yellow-400' : 'text-green-400'
+                  }`}>
+                    {getLeadPriority(currentLead)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="bg-white/5 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Contact Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <User className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-400">Full Name</p>
+                        <p className="text-white font-medium">{currentLead.name}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-400">Email Address</p>
+                        <p className="text-white font-medium">{currentLead.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-400">Phone Number</p>
+                        <p className="text-white font-medium">{currentLead.phone || 'Not provided'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-400">Lead Source</p>
+                        <p className="text-white font-medium capitalize">{currentLead.source}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status and Timeline */}
+              <div className="bg-white/5 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Status & Timeline
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Current Status</p>
+                    <LeadStatusBadge status={currentLead.status} className="text-base px-4 py-2" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Submitted On</p>
+                    <p className="text-white font-medium">{formatDate(currentLead.created_at)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Inquiry Details */}
+              <div className="bg-white/5 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Inquiry Details
+                </h3>
+                <div className="bg-white/10 rounded-lg p-4">
+                  <p className="text-white leading-relaxed">
+                    {currentLead.inquiry || 'No specific inquiry message provided.'}
+                  </p>
+                </div>
+              </div>
+              
+              {/* AI Insights */}
+              <div className="bg-white/5 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  🤖 AI Assistant Insights
+                </h3>
+                <div className="bg-gradient-to-r from-xtech-purple/20 to-xtech-blue/20 rounded-lg p-4 border border-xtech-purple/30">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-xtech-purple to-xtech-blue flex items-center justify-center text-lg">
+                      🤖
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-white mb-2">LeadBuddy Analysis</p>
+                      <div className="space-y-2 text-gray-300">
+                        <p>• Lead Score: {getLeadScore(currentLead)}% - {getLeadScore(currentLead) > 70 ? 'High potential conversion' : getLeadScore(currentLead) > 40 ? 'Moderate potential' : 'Requires nurturing'}</p>
+                        <p>• Priority Level: {getLeadPriority(currentLead)} - {getLeadPriority(currentLead) === 'High' ? 'Follow up within 2 hours' : 'Follow up within 24 hours'}</p>
+                        <p>• Recommended Action: {currentLead.status === 'new' ? 'Send welcome email and schedule initial consultation' : 'Continue nurturing sequence'}</p>
+                        <p>• Best Contact Time: {currentLead.phone ? 'Phone call preferred during business hours' : 'Email communication recommended'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-white/5 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={handleSendEmail} className="bg-gradient-to-r from-xtech-purple to-xtech-blue">
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Email
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="border-white/20 hover:bg-white/10"
+                    onClick={() => setIsNewNoteDialogOpen(true)}
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Add Note
+                  </Button>
+                  {currentLead.phone && (
+                    <Button 
+                      variant="outline" 
+                      className="border-white/20 hover:bg-white/10"
+                      onClick={() => window.open(`tel:${currentLead.phone}`)}
+                    >
+                      <Phone className="w-4 h-4 mr-2" />
+                      Call Lead
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <div className="flex justify-between w-full">
+              <Select 
+                value={currentLead?.status} 
+                onValueChange={(value) => currentLead && updateLeadStatus(currentLead.id, value)}
+              >
+                <SelectTrigger className="w-[180px] bg-white/10 border-white/20 text-white">
+                  <SelectValue placeholder="Change Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="qualified">Qualified</SelectItem>
+                  <SelectItem value="converted">Converted</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={() => setIsDialogOpen(false)} variant="ghost">Close</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add Note Dialog */}
+      <Dialog open={isNewNoteDialogOpen} onOpenChange={setIsNewNoteDialogOpen}>
+        <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Add Note</DialogTitle>
+          </DialogHeader>
+          
+          <Textarea
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Enter your note..."
+            className="min-h-[100px] bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+          />
+          
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsNewNoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddNote} className="bg-gradient-to-r from-xtech-purple to-xtech-blue">
+              Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -49,7 +48,12 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     recipientEmail: '',
     recipientName: '',
   });
-  const [originalHtmlContent, setOriginalHtmlContent] = useState<string>('');
+  const [originalEmailData, setOriginalEmailData] = useState<EmailData>({
+    subject: '',
+    content: '',
+    recipientEmail: '',
+    recipientName: '',
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [hasBeenEdited, setHasBeenEdited] = useState(false);
@@ -81,7 +85,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
       console.log('Generated email data:', data);
 
-      // Extract the content based on email type
+      // Extract the content based on email type - use the correct property
       let content = '';
       if (emailType === 'welcome') {
         content = data.emailContent || '';
@@ -91,28 +95,30 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         content = data.demoContent || '';
       }
 
-      // Store the original HTML content
-      setOriginalHtmlContent(content);
-      
       const subject = extractSubjectFromEmailType(emailType, lead.name);
       
-      setEmailData({
+      const generatedEmailData = {
         subject: subject,
         content: content,
         recipientEmail: lead.email,
         recipientName: lead.name,
-      });
+      };
+
+      // Store both original and current email data
+      setOriginalEmailData(generatedEmailData);
+      setEmailData(generatedEmailData);
     } catch (error) {
       console.error('Error generating email draft:', error);
       // Fallback to local generation if backend fails
       const draftData = generateLocalEmailContent(emailType, lead);
-      setOriginalHtmlContent(draftData.content);
-      setEmailData({
+      const fallbackEmailData = {
         subject: draftData.subject,
         content: draftData.content,
         recipientEmail: lead.email,
         recipientName: lead.name,
-      });
+      };
+      setOriginalEmailData(fallbackEmailData);
+      setEmailData(fallbackEmailData);
     } finally {
       setIsGenerating(false);
     }
@@ -227,6 +233,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
     setIsSending(true);
     try {
+      // Send the current email data (which may be edited)
       await onSend(emailData);
       onClose();
     } catch (error) {
@@ -238,6 +245,11 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
   const handleContentChange = (newContent: string) => {
     setEmailData({ ...emailData, content: newContent });
+    setHasBeenEdited(true);
+  };
+
+  const handleSubjectChange = (newSubject: string) => {
+    setEmailData({ ...emailData, subject: newSubject });
     setHasBeenEdited(true);
   };
 
@@ -262,21 +274,33 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     return /<[a-z][\s\S]*>/i.test(content);
   };
 
-  // Determine what content to show in preview
-  const getPreviewContent = () => {
-    if (hasBeenEdited || !isHtmlContent(emailData.content)) {
-      return emailData.content;
+  // Get the content to display in the textarea (editable area)
+  const getEditableContent = () => {
+    if (hasBeenEdited) {
+      return emailData.content; // Show edited content as-is
     }
-    return originalHtmlContent || emailData.content;
+    
+    if (isHtmlContent(originalEmailData.content)) {
+      return stripHtml(originalEmailData.content); // Show plain text version of HTML
+    }
+    
+    return emailData.content; // Show as-is if already plain text
   };
 
-  // Determine what content to show in textarea
-  const getEditableContent = () => {
-    if (isHtmlContent(emailData.content) && !hasBeenEdited) {
-      return stripHtml(emailData.content);
+  // Get the content for the HTML preview
+  const getPreviewContent = () => {
+    if (hasBeenEdited) {
+      return null; // No HTML preview for edited content
     }
-    return emailData.content;
+    
+    if (isHtmlContent(originalEmailData.content)) {
+      return originalEmailData.content; // Show original HTML
+    }
+    
+    return null; // No HTML preview for plain text
   };
+
+  const showHtmlPreview = !hasBeenEdited && isHtmlContent(originalEmailData.content);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -339,7 +363,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               <Input
                 id="subject"
                 value={emailData.subject}
-                onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
+                onChange={(e) => handleSubjectChange(e.target.value)}
                 className="bg-white/10 border-white/20 text-white"
                 placeholder="Enter email subject..."
               />
@@ -350,7 +374,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               <Label htmlFor="content" className="text-gray-300 flex items-center gap-2">
                 <Edit className="w-4 h-4" />
                 Email Content
-                {isHtmlContent(originalHtmlContent) && !hasBeenEdited && (
+                {showHtmlPreview && (
                   <span className="text-xs text-blue-400">(HTML email - editing will convert to plain text)</span>
                 )}
               </Label>
@@ -364,7 +388,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             </div>
 
             {/* HTML Preview for original HTML emails */}
-            {isHtmlContent(originalHtmlContent) && !hasBeenEdited && (
+            {showHtmlPreview && (
               <div>
                 <Label className="text-gray-300 flex items-center gap-2">
                   <Mail className="w-4 h-4" />
@@ -372,7 +396,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
                 </Label>
                 <div 
                   className="bg-white/5 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: getPreviewContent() }}
+                  dangerouslySetInnerHTML={{ __html: getPreviewContent() || '' }}
                 />
               </div>
             )}
@@ -381,7 +405,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
                 💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown.
-                {isHtmlContent(originalHtmlContent) && !hasBeenEdited && " This email contains HTML formatting - see preview above. Editing will convert to plain text."}
+                {showHtmlPreview && " This email contains HTML formatting - see preview above. Editing will convert to plain text."}
                 {hasBeenEdited && " Your edits will be sent as plain text."}
               </p>
             </div>

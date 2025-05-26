@@ -27,6 +27,7 @@ import {
   DollarSign, Star, Clock, Eye, MessageSquare, RefreshCw, Loader2, User, Globe, Tag
 } from 'lucide-react';
 import LeadStatusBadge from './LeadStatusBadge';
+import EmailDraftDialog from './EmailDraftDialog';
 
 interface Lead {
   id: string;
@@ -58,6 +59,11 @@ const EnhancedLeadManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState<boolean>(false);
   const [newNote, setNewNote] = useState<string>('');
+
+  // Email draft dialog states
+  const [isEmailDraftOpen, setIsEmailDraftOpen] = useState<boolean>(false);
+  const [emailDraftLead, setEmailDraftLead] = useState<Lead | null>(null);
+  const [emailDraftType, setEmailDraftType] = useState<'welcome' | 'follow_up' | 'demo' | null>(null);
 
   const fetchLeads = async () => {
     console.log('🔄 Fetching leads...');
@@ -285,7 +291,30 @@ const EnhancedLeadManagement = () => {
       });
       return;
     }
-    
+
+    // For email actions, open the draft dialog instead of sending directly
+    if (action === 'send_welcome_email' || action === 'welcome_email') {
+      setEmailDraftLead(leadData);
+      setEmailDraftType('welcome');
+      setIsEmailDraftOpen(true);
+      return;
+    }
+
+    if (action === 'schedule_follow_up' || action === 'follow_up_email') {
+      setEmailDraftLead(leadData);
+      setEmailDraftType('follow_up');
+      setIsEmailDraftOpen(true);
+      return;
+    }
+
+    if (action === 'send_demo_link' || action === 'demo_scheduler') {
+      setEmailDraftLead(leadData);
+      setEmailDraftType('demo');
+      setIsEmailDraftOpen(true);
+      return;
+    }
+
+    // For non-email actions, proceed as before
     const actionKey = `${leadId}-${action}`;
     setExecutingActions(prev => new Set([...prev, actionKey]));
     
@@ -315,47 +344,83 @@ const EnhancedLeadManagement = () => {
 
       console.log('✅ Action executed successfully:', data);
 
-      // Show success message based on action type
-      let successMessage = '';
-      switch (action) {
-        case 'send_welcome_email':
-        case 'welcome_email':
-          successMessage = `📧 Welcome email sent to ${leadData.name} at ${leadData.email}`;
-          // Update lead status to contacted
-          await updateLeadStatus(leadId, 'contacted');
-          break;
-        case 'schedule_follow_up':
-        case 'follow_up_email':
-          successMessage = `📞 Follow-up scheduled and email sent to ${leadData.name}`;
-          break;
-        case 'send_demo_link':
-        case 'demo_scheduler':
-          successMessage = `🎥 Demo link sent to ${leadData.name} at ${leadData.email}`;
-          break;
-        case 'priority_outreach':
-          successMessage = `⭐ Priority outreach initiated for ${leadData.name}`;
-          // Update lead status to qualified
-          await updateLeadStatus(leadId, 'qualified');
-          break;
-        default:
-          successMessage = `✅ Action ${action} completed for ${leadData.name}`;
-      }
+      let successMessage = `✅ Action ${action} completed for ${leadData.name}`;
 
       toast({
         title: "🤖 LeadBuddy Action Complete",
         description: successMessage,
       });
 
-      // If there's email content in the response, log it
-      if (data.emailContent || data.demoContent) {
-        console.log('📧 Email content preview:', data.emailContent || data.demoContent);
-      }
-
     } catch (error) {
       console.error('Error executing AI action:', error);
       toast({
         title: "❌ Action Failed",
         description: `Failed to execute ${action} for ${leadData.name}: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setExecutingActions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(actionKey);
+        return newSet;
+      });
+    }
+  };
+
+  const handleSendEmailDraft = async (emailData: any) => {
+    if (!emailDraftLead || !emailDraftType) return;
+
+    const actionKey = `${emailDraftLead.id}-${emailDraftType}`;
+    setExecutingActions(prev => new Set([...prev, actionKey]));
+
+    try {
+      console.log(`📧 Sending ${emailDraftType} email to ${emailDraftLead.name}`);
+
+      // Call the edge function with the custom email content
+      const { data, error } = await supabase.functions.invoke('execute-lead-action', {
+        body: {
+          leadId: emailDraftLead.id,
+          action: emailDraftType === 'welcome' ? 'send_welcome_email' : 
+                 emailDraftType === 'follow_up' ? 'schedule_follow_up' : 'send_demo_link',
+          leadData: {
+            id: emailDraftLead.id,
+            name: emailDraftLead.name,
+            email: emailDraftLead.email,
+            phone: emailDraftLead.phone || 'Not provided',
+            inquiry: emailDraftLead.inquiry || 'General inquiry',
+            source: emailDraftLead.source
+          },
+          customEmail: {
+            subject: emailData.subject,
+            content: emailData.content
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`Failed to send email: ${error.message}`);
+      }
+
+      console.log('✅ Email sent successfully:', data);
+
+      // Update lead status based on email type
+      if (emailDraftType === 'welcome') {
+        await updateLeadStatus(emailDraftLead.id, 'contacted');
+      } else if (emailDraftType === 'demo') {
+        await updateLeadStatus(emailDraftLead.id, 'qualified');
+      }
+
+      toast({
+        title: "📧 Email Sent Successfully",
+        description: `${emailDraftType === 'welcome' ? 'Welcome' : emailDraftType === 'follow_up' ? 'Follow-up' : 'Demo'} email sent to ${emailDraftLead.name}`,
+      });
+
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast({
+        title: "❌ Email Send Failed",
+        description: `Failed to send email to ${emailDraftLead.name}: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -895,6 +960,19 @@ const EnhancedLeadManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Email Draft Dialog */}
+      <EmailDraftDialog
+        isOpen={isEmailDraftOpen}
+        onClose={() => {
+          setIsEmailDraftOpen(false);
+          setEmailDraftLead(null);
+          setEmailDraftType(null);
+        }}
+        onSend={handleSendEmailDraft}
+        lead={emailDraftLead}
+        emailType={emailDraftType}
+      />
     </div>
   );
 };

@@ -233,6 +233,13 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
     setIsSending(true);
     try {
+      console.log('📤 Sending email with current dialog content:', {
+        subject: emailData.subject,
+        contentLength: emailData.content.length,
+        hasBeenEdited,
+        recipientEmail: emailData.recipientEmail
+      });
+
       // Always send the current email data (which includes any edits)
       await onSend(emailData);
       onClose();

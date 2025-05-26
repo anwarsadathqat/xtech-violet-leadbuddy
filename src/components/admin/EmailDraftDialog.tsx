@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Mail, Send, Edit, Loader2 } from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
 
 interface EmailDraftDialogProps {
   isOpen: boolean;
@@ -63,23 +64,62 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     setIsGenerating(true);
     
     try {
-      // Generate email content based on type and lead data
-      const draftData = generateEmailContent(emailType, lead);
+      // Call the actual backend function to generate the email content
+      const { data, error } = await supabase.functions.invoke('execute-lead-action', {
+        body: {
+          leadId: lead.id,
+          action: getActionFromEmailType(emailType),
+          leadData: lead,
+          previewOnly: true // Add a flag to indicate this is just for preview
+        }
+      });
+
+      if (error) throw error;
+
+      // Extract subject and content from the generated email
+      const subject = extractSubjectFromEmailType(emailType, lead.name);
+      const content = data.emailContent || data.demoContent || data.reEngagementContent || '';
       
+      setEmailData({
+        subject: subject,
+        content: content,
+        recipientEmail: lead.email,
+        recipientName: lead.name,
+      });
+    } catch (error) {
+      console.error('Error generating email draft:', error);
+      // Fallback to local generation if backend fails
+      const draftData = generateLocalEmailContent(emailType, lead);
       setEmailData({
         subject: draftData.subject,
         content: draftData.content,
         recipientEmail: lead.email,
         recipientName: lead.name,
       });
-    } catch (error) {
-      console.error('Error generating email draft:', error);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const generateEmailContent = (type: string, leadData: any) => {
+  const getActionFromEmailType = (type: string) => {
+    const actionMap = {
+      welcome: 'send_welcome_email',
+      follow_up: 'follow_up_email',
+      demo: 'send_demo_link'
+    };
+    return actionMap[type as keyof typeof actionMap] || 'send_welcome_email';
+  };
+
+  const extractSubjectFromEmailType = (type: string, name: string) => {
+    const subjects = {
+      welcome: `Welcome to XTech Solutions, ${name}!`,
+      follow_up: `Following up on your XTech inquiry, ${name}`,
+      demo: `Your XTech Demo is Ready, ${name}!`
+    };
+    return subjects[type as keyof typeof subjects] || `Message from XTech Solutions, ${name}`;
+  };
+
+  const generateLocalEmailContent = (type: string, leadData: any) => {
     const templates = {
       welcome: {
         subject: `Welcome to XTech Solutions, ${leadData.name}!`,
@@ -194,6 +234,18 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
     return emailType ? titles[emailType] : 'Email Draft';
   };
 
+  // Function to strip HTML and show plain text preview
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  };
+
+  // Function to detect if content is HTML
+  const isHtmlContent = (content: string) => {
+    return /<[a-z][\s\S]*>/i.test(content);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -266,20 +318,38 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
               <Label htmlFor="content" className="text-gray-300 flex items-center gap-2">
                 <Edit className="w-4 h-4" />
                 Email Content
+                {isHtmlContent(emailData.content) && (
+                  <span className="text-xs text-blue-400">(HTML email - editing will convert to plain text)</span>
+                )}
               </Label>
               <Textarea
                 id="content"
-                value={emailData.content}
+                value={isHtmlContent(emailData.content) ? stripHtml(emailData.content) : emailData.content}
                 onChange={(e) => setEmailData({ ...emailData, content: e.target.value })}
                 className="bg-white/10 border-white/20 text-white min-h-[400px]"
                 placeholder="Enter email content..."
               />
             </div>
 
+            {/* HTML Preview for HTML emails */}
+            {isHtmlContent(emailData.content) && (
+              <div>
+                <Label className="text-gray-300 flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  HTML Email Preview
+                </Label>
+                <div 
+                  className="bg-white/5 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
+                  dangerouslySetInnerHTML={{ __html: emailData.content }}
+                />
+              </div>
+            )}
+
             {/* Preview Note */}
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
                 💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown here.
+                {isHtmlContent(emailData.content) && " This email contains HTML formatting - see preview above."}
               </p>
             </div>
           </div>

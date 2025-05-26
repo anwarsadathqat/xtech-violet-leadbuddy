@@ -17,6 +17,7 @@ interface ActionRequest {
     inquiry?: string;
     source: string;
   };
+  previewOnly?: boolean; // Add flag for preview mode
 }
 
 serve(async (req) => {
@@ -30,49 +31,51 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { leadId, action, leadData }: ActionRequest = await req.json();
+    const { leadId, action, leadData, previewOnly }: ActionRequest = await req.json();
     
-    console.log(`🤖 LeadBuddy executing ${action} for lead ${leadData.name}`);
+    console.log(`🤖 LeadBuddy ${previewOnly ? 'previewing' : 'executing'} ${action} for lead ${leadData.name}`);
 
     let result = { success: false, message: "" };
 
     switch (action) {
       case 'welcome_email':
       case 'send_welcome_email':
-        result = await sendWelcomeEmail(leadData);
+        result = await sendWelcomeEmail(leadData, previewOnly);
         break;
       case 'follow_up_email':
       case 'schedule_follow_up':
-        result = await scheduleFollowUp(leadData, supabase);
+        result = await scheduleFollowUp(leadData, supabase, previewOnly);
         break;
       case 'send_demo_link':
-        result = await sendDemoLink(leadData);
+        result = await sendDemoLink(leadData, previewOnly);
         break;
       case 'priority_alert':
       case 'priority_outreach':
-        result = await priorityOutreach(leadData, supabase, leadId);
+        result = await priorityOutreach(leadData, supabase, leadId, previewOnly);
         break;
       case 'demo_scheduler':
-        result = await scheduleDemoMeeting(leadData, supabase);
+        result = await scheduleDemoMeeting(leadData, supabase, previewOnly);
         break;
       case 're_engagement':
-        result = await reEngagementCampaign(leadData);
+        result = await reEngagementCampaign(leadData, previewOnly);
         break;
       default:
         result = { success: false, message: `Unknown action: ${action}` };
     }
 
-    // Log the action in the database (create table if needed)
-    try {
-      await supabase.from('lead_actions').insert({
-        lead_id: leadId,
-        action: action,
-        result: result.success ? 'success' : 'failed',
-        details: result.message,
-        executed_at: new Date().toISOString()
-      });
-    } catch (logError) {
-      console.log('Note: lead_actions table not found, action will not be logged');
+    // Only log the action in the database if it's not a preview
+    if (!previewOnly) {
+      try {
+        await supabase.from('lead_actions').insert({
+          lead_id: leadId,
+          action: action,
+          result: result.success ? 'success' : 'failed',
+          details: result.message,
+          executed_at: new Date().toISOString()
+        });
+      } catch (logError) {
+        console.log('Note: lead_actions table not found, action will not be logged');
+      }
     }
 
     return new Response(
@@ -192,13 +195,22 @@ async function sendRealEmail(to: string, subject: string, htmlContent: string) {
   }
 }
 
-async function sendWelcomeEmail(leadData: any) {
+async function sendWelcomeEmail(leadData: any, previewOnly = false) {
   try {
     // Generate personalized email content using DeepSeek
     const emailContent = await generateEmailContent(leadData, 'welcome');
     
     console.log(`📧 Welcome email content generated for ${leadData.email}`);
     console.log(`Email preview: ${emailContent.substring(0, 100)}...`);
+    
+    // If it's preview only, just return the content
+    if (previewOnly) {
+      return { 
+        success: true, 
+        message: `✅ Welcome email content generated for preview`,
+        emailContent
+      };
+    }
     
     // Send real email
     const emailResult = await sendRealEmail(
@@ -226,7 +238,7 @@ async function sendWelcomeEmail(leadData: any) {
   }
 }
 
-async function scheduleFollowUp(leadData: any, supabase: any) {
+async function scheduleFollowUp(leadData: any, supabase: any, previewOnly = false) {
   try {
     // Calculate optimal follow-up time (24-48 hours)
     const followUpDate = new Date();
@@ -234,6 +246,15 @@ async function scheduleFollowUp(leadData: any, supabase: any) {
     
     // Generate follow-up email content
     const emailContent = await generateEmailContent(leadData, 'follow_up');
+    
+    // If it's preview only, just return the content
+    if (previewOnly) {
+      return { 
+        success: true, 
+        message: `✅ Follow-up email content generated for preview`,
+        emailContent
+      };
+    }
     
     // Send real follow-up email
     const emailResult = await sendRealEmail(
@@ -261,11 +282,20 @@ async function scheduleFollowUp(leadData: any, supabase: any) {
   }
 }
 
-async function sendDemoLink(leadData: any) {
+async function sendDemoLink(leadData: any, previewOnly = false) {
   try {
     const demoContent = await generateEmailContent(leadData, 'demo');
     
     console.log(`🎥 Demo link email generated for ${leadData.email}`);
+    
+    // If it's preview only, just return the content
+    if (previewOnly) {
+      return { 
+        success: true, 
+        message: `✅ Demo email content generated for preview`,
+        demoContent
+      };
+    }
     
     // Send real demo email
     const emailResult = await sendRealEmail(
@@ -292,17 +322,26 @@ async function sendDemoLink(leadData: any) {
   }
 }
 
-async function priorityOutreach(leadData: any, supabase: any, leadId: string) {
+async function priorityOutreach(leadData: any, supabase: any, leadId: string, previewOnly = false) {
   try {
+    // Generate priority outreach email
+    const emailContent = await generateEmailContent(leadData, 'priority_outreach');
+    
+    // If it's preview only, just return the content
+    if (previewOnly) {
+      return { 
+        success: true, 
+        message: `✅ Priority outreach email content generated for preview`,
+        emailContent
+      };
+    }
+    
     // Update lead status to high priority
     if (leadId && leadData.id) {
       await supabase.from('leads').update({
         status: 'qualified'
       }).eq('id', leadId);
     }
-    
-    // Generate priority outreach email
-    const emailContent = await generateEmailContent(leadData, 'priority_outreach');
     
     // Send real priority email
     const emailResult = await sendRealEmail(
@@ -330,9 +369,18 @@ async function priorityOutreach(leadData: any, supabase: any, leadId: string) {
   }
 }
 
-async function scheduleDemoMeeting(leadData: any, supabase: any) {
+async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = false) {
   try {
     const demoContent = await generateEmailContent(leadData, 'demo_meeting');
+    
+    // If it's preview only, just return the content
+    if (previewOnly) {
+      return { 
+        success: true, 
+        message: `✅ Demo meeting email content generated for preview`,
+        demoContent
+      };
+    }
     
     // Send real demo meeting email
     const emailResult = await sendRealEmail(
@@ -360,9 +408,18 @@ async function scheduleDemoMeeting(leadData: any, supabase: any) {
   }
 }
 
-async function reEngagementCampaign(leadData: any) {
+async function reEngagementCampaign(leadData: any, previewOnly = false) {
   try {
     const reEngagementContent = await generateEmailContent(leadData, 're_engagement');
+    
+    // If it's preview only, just return the content
+    if (previewOnly) {
+      return { 
+        success: true, 
+        message: `✅ Re-engagement email content generated for preview`,
+        emailContent: reEngagementContent
+      };
+    }
     
     // Send real re-engagement email
     const emailResult = await sendRealEmail(
@@ -510,7 +567,7 @@ function generateFallbackEmail(leadData: any, emailType: string) {
           <p style="font-size: 16px; color: #333; line-height: 1.6;">I wanted to follow up on your recent inquiry about "${leadData.inquiry || 'IT services'}" and see how we can help move your project forward.</p>
           <p style="font-size: 16px; color: #333; line-height: 1.6;">At XTech, we understand that choosing the right IT partner is crucial for your business success. That's why we'd like to offer you a complimentary consultation to discuss your specific needs.</p>
           
-          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #6c22d8;">
+          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">
             <h3 style="color: #6c22d8; margin-top: 0;">How we can help:</h3>
             <ul style="color: #333; line-height: 1.8;">
               <li>Assess your current IT infrastructure</li>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -85,14 +86,14 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
       console.log('Generated email data:', data);
 
-      // Extract the content based on email type - use the correct property
+      // Extract the content - all actions should return emailContent
       let content = '';
-      if (emailType === 'welcome') {
-        content = data.emailContent || '';
-      } else if (emailType === 'follow_up') {
-        content = data.emailContent || '';
-      } else if (emailType === 'demo') {
-        content = data.demoContent || '';
+      if (data.emailContent) {
+        content = data.emailContent;
+      } else if (data.demoContent) {
+        content = data.demoContent;
+      } else {
+        throw new Error('No email content returned from API');
       }
 
       const subject = extractSubjectFromEmailType(emailType, lead.name);
@@ -233,7 +234,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
     setIsSending(true);
     try {
-      // Send the current email data (which may be edited)
+      // Always send the current email data (which includes any edits)
       await onSend(emailData);
       onClose();
     } catch (error) {
@@ -401,10 +402,21 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               </div>
             )}
 
+            {/* Debug Information */}
+            <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
+              <p className="text-yellow-400 text-sm">
+                🔍 <strong>Debug Info:</strong><br />
+                Content Length: {emailData.content.length} characters<br />
+                Has been edited: {hasBeenEdited ? 'Yes' : 'No'}<br />
+                Is HTML: {isHtmlContent(emailData.content) ? 'Yes' : 'No'}<br />
+                Email Type: {emailType}
+              </p>
+            </div>
+
             {/* Preview Note */}
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
-                💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown.
+                💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown in the content field.
                 {showHtmlPreview && " This email contains HTML formatting - see preview above. Editing will convert to plain text."}
                 {hasBeenEdited && " Your edits will be sent as plain text."}
               </p>

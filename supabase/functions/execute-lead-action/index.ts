@@ -284,7 +284,7 @@ async function scheduleFollowUp(leadData: any, supabase: any, previewOnly = fals
 
 async function sendDemoLink(leadData: any, previewOnly = false) {
   try {
-    const demoContent = await generateEmailContent(leadData, 'demo');
+    const emailContent = await generateEmailContent(leadData, 'demo');
     
     console.log(`🎥 Demo link email generated for ${leadData.email}`);
     
@@ -293,7 +293,7 @@ async function sendDemoLink(leadData: any, previewOnly = false) {
       return { 
         success: true, 
         message: `✅ Demo email content generated for preview`,
-        demoContent
+        emailContent
       };
     }
     
@@ -301,14 +301,14 @@ async function sendDemoLink(leadData: any, previewOnly = false) {
     const emailResult = await sendRealEmail(
       leadData.email,
       `Your XTech Demo is Ready, ${leadData.name}!`,
-      demoContent
+      emailContent
     );
     
     if (emailResult.success) {
       return { 
         success: true, 
         message: `✅ Demo link sent successfully to ${leadData.name} at ${leadData.email}`,
-        demoContent,
+        emailContent,
         messageId: emailResult.messageId
       };
     } else {
@@ -371,14 +371,14 @@ async function priorityOutreach(leadData: any, supabase: any, leadId: string, pr
 
 async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = false) {
   try {
-    const demoContent = await generateEmailContent(leadData, 'demo_meeting');
+    const emailContent = await generateEmailContent(leadData, 'demo_meeting');
     
     // If it's preview only, just return the content
     if (previewOnly) {
       return { 
         success: true, 
         message: `✅ Demo meeting email content generated for preview`,
-        demoContent
+        emailContent
       };
     }
     
@@ -386,7 +386,7 @@ async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = f
     const emailResult = await sendRealEmail(
       leadData.email,
       `Demo Meeting Scheduled: ${leadData.name}`,
-      demoContent
+      emailContent
     );
     
     if (emailResult.success) {
@@ -394,7 +394,7 @@ async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = f
       return { 
         success: true, 
         message: `✅ Demo meeting scheduled and invitation sent to ${leadData.name}`,
-        demoContent,
+        emailContent,
         messageId: emailResult.messageId
       };
     } else {
@@ -410,14 +410,14 @@ async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = f
 
 async function reEngagementCampaign(leadData: any, previewOnly = false) {
   try {
-    const reEngagementContent = await generateEmailContent(leadData, 're_engagement');
+    const emailContent = await generateEmailContent(leadData, 're_engagement');
     
     // If it's preview only, just return the content
     if (previewOnly) {
       return { 
         success: true, 
         message: `✅ Re-engagement email content generated for preview`,
-        emailContent: reEngagementContent
+        emailContent
       };
     }
     
@@ -425,7 +425,7 @@ async function reEngagementCampaign(leadData: any, previewOnly = false) {
     const emailResult = await sendRealEmail(
       leadData.email,
       `We miss you! ${leadData.name}, let's reconnect`,
-      reEngagementContent
+      emailContent
     );
     
     if (emailResult.success) {
@@ -433,7 +433,7 @@ async function reEngagementCampaign(leadData: any, previewOnly = false) {
       return { 
         success: true, 
         message: `✅ Re-engagement email sent to ${leadData.name}`,
-        emailContent: reEngagementContent,
+        emailContent,
         messageId: emailResult.messageId
       };
     } else {
@@ -452,12 +452,12 @@ async function generateEmailContent(leadData: any, emailType: string) {
     const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "sk-2595b04336514d20834d335707c20a8d";
     
     const systemPrompts = {
-      welcome: "You are LeadBuddy, writing a professional welcome email for XTech, an IT services company. Create a warm, personalized welcome email that introduces our services and next steps. Format as HTML email.",
-      demo: "You are LeadBuddy, writing a demo invitation email for XTech. Include a compelling subject line and clear call-to-action for scheduling a product demonstration. Format as HTML email.",
-      demo_meeting: "You are LeadBuddy, writing a demo meeting confirmation email for XTech. Include meeting details and what to expect during the demo. Format as HTML email.",
-      re_engagement: "You are LeadBuddy, writing a re-engagement email for XTech. Create a compelling email to reconnect with a lead who hasn't responded recently. Format as HTML email.",
-      follow_up: "You are LeadBuddy, writing a professional follow-up email for XTech. Check in on their IT needs and offer assistance. Format as HTML email.",
-      priority_outreach: "You are LeadBuddy, writing a priority outreach email for XTech for a high-value lead. Express urgency and offer immediate consultation. Format as HTML email."
+      welcome: "You are LeadBuddy, writing a professional welcome email for XTech, an IT services company. Create a warm, personalized welcome email that introduces our services and next steps. Format as HTML email with proper structure and complete content. IMPORTANT: Always include a complete conclusion and call-to-action. Do not truncate the email.",
+      demo: "You are LeadBuddy, writing a demo invitation email for XTech. Include a compelling subject line and clear call-to-action for scheduling a product demonstration. Format as HTML email with proper structure and complete content. IMPORTANT: Always include a complete conclusion and call-to-action. Do not truncate the email.",
+      demo_meeting: "You are LeadBuddy, writing a demo meeting confirmation email for XTech. Include meeting details and what to expect during the demo. Format as HTML email with proper structure and complete content. IMPORTANT: Always include a complete conclusion and call-to-action. Do not truncate the email.",
+      re_engagement: "You are LeadBuddy, writing a re-engagement email for XTech. Create a compelling email to reconnect with a lead who hasn't responded recently. Format as HTML email with proper structure and complete content. IMPORTANT: Always include a complete conclusion and call-to-action. Do not truncate the email.",
+      follow_up: "You are LeadBuddy, writing a professional follow-up email for XTech. Check in on their IT needs and offer assistance. Format as HTML email with proper structure and complete content. IMPORTANT: Always include a complete conclusion and call-to-action. Do not truncate the email.",
+      priority_outreach: "You are LeadBuddy, writing a priority outreach email for XTech for a high-value lead. Express urgency and offer immediate consultation. Format as HTML email with proper structure and complete content. IMPORTANT: Always include a complete conclusion and call-to-action. Do not truncate the email."
     };
     
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
@@ -475,24 +475,26 @@ async function generateEmailContent(leadData: any, emailType: string) {
           },
           {
             role: "user",
-            content: `Create a ${emailType} email for:
+            content: `Create a complete ${emailType} email for:
             Name: ${leadData.name}
             Email: ${leadData.email}
             Phone: ${leadData.phone || 'Not provided'}
             Inquiry: ${leadData.inquiry || 'General IT services inquiry'}
             Source: ${leadData.source}
             
-            Make it personalized, professional, and formatted as HTML. Include proper styling.`
+            Make it personalized, professional, and formatted as HTML. Include proper styling and ensure the email is COMPLETE with proper conclusion and call-to-action. Do not truncate or cut off the content.`
           }
         ],
         temperature: 0.7,
-        max_tokens: 600
+        max_tokens: 1000 // Increased token limit to ensure complete emails
       }),
     });
 
     if (response.ok) {
       const data = await response.json();
-      return data.choices[0].message.content;
+      const content = data.choices[0].message.content;
+      console.log(`✅ Generated complete email content (${content.length} characters)`);
+      return content;
     } else {
       console.error(`DeepSeek API failed for ${emailType} email generation`);
       // Fallback template

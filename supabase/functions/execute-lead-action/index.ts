@@ -486,7 +486,7 @@ async function generateEmailContent(leadData: any, emailType: string) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 1000 // Increased token limit to ensure complete emails
+        max_tokens: 1500 // Increased from 1000 to 1500
       }),
     });
 

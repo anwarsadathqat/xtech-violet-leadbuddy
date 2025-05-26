@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -275,33 +274,8 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     return /<[a-z][\s\S]*>/i.test(content);
   };
 
-  // Get the content to display in the textarea (editable area)
-  const getEditableContent = () => {
-    if (hasBeenEdited) {
-      return emailData.content; // Show edited content as-is
-    }
-    
-    if (isHtmlContent(originalEmailData.content)) {
-      return stripHtml(originalEmailData.content); // Show plain text version of HTML
-    }
-    
-    return emailData.content; // Show as-is if already plain text
-  };
-
-  // Get the content for the HTML preview
-  const getPreviewContent = () => {
-    if (hasBeenEdited) {
-      return null; // No HTML preview for edited content
-    }
-    
-    if (isHtmlContent(originalEmailData.content)) {
-      return originalEmailData.content; // Show original HTML
-    }
-    
-    return null; // No HTML preview for plain text
-  };
-
-  const showHtmlPreview = !hasBeenEdited && isHtmlContent(originalEmailData.content);
+  // Always show HTML preview if original content was HTML, even after editing
+  const showHtmlPreview = isHtmlContent(originalEmailData.content);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -375,29 +349,32 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               <Label htmlFor="content" className="text-gray-300 flex items-center gap-2">
                 <Edit className="w-4 h-4" />
                 Email Content
-                {showHtmlPreview && (
-                  <span className="text-xs text-blue-400">(HTML email - editing will convert to plain text)</span>
+                {hasBeenEdited && (
+                  <span className="text-xs text-yellow-400">(Edited - will be sent as plain text)</span>
                 )}
               </Label>
               <Textarea
                 id="content"
-                value={getEditableContent()}
+                value={hasBeenEdited ? emailData.content : (isHtmlContent(emailData.content) ? stripHtml(emailData.content) : emailData.content)}
                 onChange={(e) => handleContentChange(e.target.value)}
                 className="bg-white/10 border-white/20 text-white min-h-[400px]"
                 placeholder="Enter email content..."
               />
             </div>
 
-            {/* HTML Preview for original HTML emails */}
+            {/* HTML Preview - Always show if original content was HTML */}
             {showHtmlPreview && (
               <div>
                 <Label className="text-gray-300 flex items-center gap-2">
                   <Mail className="w-4 h-4" />
                   Original HTML Email Preview
+                  {hasBeenEdited && (
+                    <span className="text-xs text-yellow-400">(Preview shows original - edited version will be plain text)</span>
+                  )}
                 </Label>
                 <div 
                   className="bg-white/5 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: getPreviewContent() || '' }}
+                  dangerouslySetInnerHTML={{ __html: originalEmailData.content }}
                 />
               </div>
             )}
@@ -406,9 +383,10 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
               <p className="text-yellow-400 text-sm">
                 🔍 <strong>Debug Info:</strong><br />
+                Content to be sent: {hasBeenEdited ? 'Edited content (plain text)' : 'Original content'}<br />
                 Content Length: {emailData.content.length} characters<br />
                 Has been edited: {hasBeenEdited ? 'Yes' : 'No'}<br />
-                Is HTML: {isHtmlContent(emailData.content) ? 'Yes' : 'No'}<br />
+                Original is HTML: {isHtmlContent(originalEmailData.content) ? 'Yes' : 'No'}<br />
                 Email Type: {emailType}
               </p>
             </div>
@@ -416,9 +394,10 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             {/* Preview Note */}
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
-                💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown in the content field.
-                {showHtmlPreview && " This email contains HTML formatting - see preview above. Editing will convert to plain text."}
-                {hasBeenEdited && " Your edits will be sent as plain text."}
+                💡 <strong>Tip:</strong> You can edit the subject and content above. 
+                {!hasBeenEdited && isHtmlContent(originalEmailData.content) && " The original HTML formatting will be preserved when sent."}
+                {hasBeenEdited && " Your edits will be sent as plain text, but you can see the original HTML preview above."}
+                {!isHtmlContent(originalEmailData.content) && " This email will be sent as plain text."}
               </p>
             </div>
           </div>

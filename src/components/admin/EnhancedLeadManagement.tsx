@@ -441,7 +441,7 @@ const EnhancedLeadManagement = () => {
                 AI-powered lead scoring and automated lifecycle management • {leads.length} total leads
               </CardDescription>
               <div className="mt-2 text-sm">
-                <p className="text-blue-400">🔍 Debug Info:</p>
+                <p className="text-blue-400">🔍 Info:</p>
                 <p className="text-gray-400">• Connection: {connectionStatus}</p>
                 <p className="text-gray-400">• Raw leads fetched: {leads.length}</p>
                 <p className="text-gray-400">• Filtered results: {filteredLeads.length}</p>

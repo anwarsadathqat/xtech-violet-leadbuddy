@@ -49,8 +49,10 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     recipientEmail: '',
     recipientName: '',
   });
+  const [originalHtmlContent, setOriginalHtmlContent] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [hasBeenEdited, setHasBeenEdited] = useState(false);
 
   useEffect(() => {
     if (isOpen && lead && emailType) {
@@ -62,23 +64,37 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     if (!lead || !emailType) return;
 
     setIsGenerating(true);
+    setHasBeenEdited(false);
     
     try {
-      // Call the actual backend function to generate the email content
+      // Call the backend function to generate the email content
       const { data, error } = await supabase.functions.invoke('execute-lead-action', {
         body: {
           leadId: lead.id,
           action: getActionFromEmailType(emailType),
           leadData: lead,
-          previewOnly: true // Add a flag to indicate this is just for preview
+          previewOnly: true
         }
       });
 
       if (error) throw error;
 
-      // Extract subject and content from the generated email
+      console.log('Generated email data:', data);
+
+      // Extract the content based on email type
+      let content = '';
+      if (emailType === 'welcome') {
+        content = data.emailContent || '';
+      } else if (emailType === 'follow_up') {
+        content = data.emailContent || '';
+      } else if (emailType === 'demo') {
+        content = data.demoContent || '';
+      }
+
+      // Store the original HTML content
+      setOriginalHtmlContent(content);
+      
       const subject = extractSubjectFromEmailType(emailType, lead.name);
-      const content = data.emailContent || data.demoContent || data.reEngagementContent || '';
       
       setEmailData({
         subject: subject,
@@ -90,6 +106,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
       console.error('Error generating email draft:', error);
       // Fallback to local generation if backend fails
       const draftData = generateLocalEmailContent(emailType, lead);
+      setOriginalHtmlContent(draftData.content);
       setEmailData({
         subject: draftData.subject,
         content: draftData.content,
@@ -123,88 +140,82 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     const templates = {
       welcome: {
         subject: `Welcome to XTech Solutions, ${leadData.name}!`,
-        content: `Dear ${leadData.name},
-
-Thank you for your interest in XTech Solutions! We're excited to help you transform your business with our cutting-edge technology solutions.
-
-We received your inquiry about: ${leadData.inquiry || 'our services'}
-
-Our team specializes in delivering innovative solutions that drive real results. Based on your inquiry, we believe we can help you achieve your goals.
-
-Next Steps:
-• A member of our team will reach out within 24 hours
-• We'll schedule a consultation to understand your specific needs
-• You'll receive a customized proposal tailored to your requirements
-
-In the meantime, feel free to explore our case studies and success stories on our website.
-
-Best regards,
-The XTech Solutions Team
-
-P.S. If you have any immediate questions, don't hesitate to reply to this email or call us directly.`
+        content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #6c22d8, #00bcd4); padding: 30px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">Welcome to XTech Solutions!</h1>
+        </div>
+        <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; color: #333;">Hi ${leadData.name},</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Thank you for your interest in XTech's IT services. We're excited to help optimize your technology infrastructure and drive your business forward.</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Based on your inquiry about "<strong>${leadData.inquiry || 'IT services'}</strong>", our technical team will review your requirements and get back to you within 24 hours.</p>
+          
+          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #6c22d8;">
+            <h3 style="color: #6c22d8; margin-top: 0;">Next Steps:</h3>
+            <ul style="color: #333; line-height: 1.8;">
+              <li>Our technical consultant will contact you shortly</li>
+              <li>We'll schedule a brief consultation to understand your needs</li>
+              <li>Receive a customized solution proposal</li>
+            </ul>
+          </div>
+          
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">If you have any urgent questions, feel free to reply to this email or call us directly.</p>
+          <p style="font-size: 16px; color: #333;">Best regards,<br><strong>XTech Solutions Team</strong></p>
+        </div>
+      </div>`
       },
       follow_up: {
         subject: `Following up on your XTech Solutions inquiry`,
-        content: `Dear ${leadData.name},
-
-I hope this email finds you well. I wanted to follow up on your recent inquiry about our services.
-
-Your Original Inquiry: ${leadData.inquiry || 'General inquiry about our services'}
-
-We understand that choosing the right technology partner is a crucial decision for your business. That's why we'd love to schedule a brief consultation to:
-
-• Understand your specific challenges and goals
-• Show you how our solutions can address your needs
-• Provide you with a customized approach for your business
-
-Would you be available for a 30-minute call this week? I have availability on:
-• Tuesday at 2:00 PM or 4:00 PM
-• Wednesday at 10:00 AM or 3:00 PM
-• Thursday at 1:00 PM or 5:00 PM
-
-Please let me know what works best for your schedule, and I'll send you a calendar invite.
-
-Looking forward to speaking with you soon!
-
-Best regards,
-The XTech Solutions Team`
+        content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #6c22d8, #00bcd4); padding: 30px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">Following Up on Your IT Needs</h1>
+        </div>
+        <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; color: #333;">Hi ${leadData.name},</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">I wanted to follow up on your recent inquiry about "${leadData.inquiry || 'IT services'}" and see how we can help move your project forward.</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">At XTech, we understand that choosing the right IT partner is crucial for your business success. That's why we'd like to offer you a complimentary consultation to discuss your specific needs.</p>
+          
+          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">
+            <h3 style="color: #6c22d8; margin-top: 0;">How we can help:</h3>
+            <ul style="color: #333; line-height: 1.8;">
+              <li>Assess your current IT infrastructure</li>
+              <li>Identify optimization opportunities</li>
+              <li>Provide cost-effective solutions</li>
+              <li>Ensure seamless implementation</li>
+            </ul>
+          </div>
+          
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Would you be available for a brief 15-minute call this week? I'm happy to work around your schedule.</p>
+          <p style="font-size: 16px; color: #333;">Best regards,<br><strong>XTech Solutions Team</strong></p>
+        </div>
+      </div>`
       },
       demo: {
         subject: `Your XTech Solutions Demo - Let's Show You What's Possible`,
-        content: `Dear ${leadData.name},
-
-Great news! We'd love to show you exactly how XTech Solutions can transform your business operations.
-
-Based on your inquiry about: ${leadData.inquiry || 'our services'}
-
-We've prepared a personalized demo that will showcase:
-✓ Solutions specifically relevant to your industry
-✓ Real-world case studies from similar businesses
-✓ Live demonstration of key features
-✓ ROI projections based on your business size
-
-🎥 Schedule Your Demo:
-Click here to book a time that works for you: [Demo Booking Link]
-
-Available Time Slots:
-• 30-minute focused demo
-• 60-minute comprehensive walkthrough
-• Custom timing to fit your schedule
-
-What to Expect:
-• Screen-sharing demonstration
-• Interactive Q&A session
-• Customized recommendations
-• Next steps discussion
-
-We're confident that after seeing our solutions in action, you'll understand why businesses choose XTech Solutions to drive their digital transformation.
-
-Ready to see the future of your business operations?
-
-Best regards,
-The XTech Solutions Team
-
-P.S. Can't find a suitable time? Reply to this email, and we'll work around your schedule.`
+        content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #6c22d8, #00bcd4); padding: 30px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">Your XTech Demo Awaits!</h1>
+        </div>
+        <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; color: #333;">Hi ${leadData.name},</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">We'd love to show you how XTech can transform your IT infrastructure with a personalized demo tailored to your needs.</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="#" style="background: linear-gradient(135deg, #6c22d8, #00bcd4); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">Schedule Your Demo</a>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">
+            <h3 style="color: #6c22d8; margin-top: 0;">What you'll see in your demo:</h3>
+            <ul style="color: #333; line-height: 1.8;">
+              <li>Live demonstration of our solutions</li>
+              <li>Customized recommendations for your business</li>
+              <li>Q&A with our technical experts</li>
+              <li>ROI analysis and implementation timeline</li>
+            </ul>
+          </div>
+          
+          <p style="font-size: 16px; color: #333;">Best regards,<br><strong>XTech Solutions Team</strong></p>
+        </div>
+      </div>`
       }
     };
 
@@ -225,6 +236,11 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
     }
   };
 
+  const handleContentChange = (newContent: string) => {
+    setEmailData({ ...emailData, content: newContent });
+    setHasBeenEdited(true);
+  };
+
   const getDialogTitle = () => {
     const titles = {
       welcome: 'Welcome Email Draft',
@@ -234,7 +250,7 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
     return emailType ? titles[emailType] : 'Email Draft';
   };
 
-  // Function to strip HTML and show plain text preview
+  // Function to strip HTML and show plain text
   const stripHtml = (html: string) => {
     const tmp = document.createElement("div");
     tmp.innerHTML = html;
@@ -244,6 +260,22 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
   // Function to detect if content is HTML
   const isHtmlContent = (content: string) => {
     return /<[a-z][\s\S]*>/i.test(content);
+  };
+
+  // Determine what content to show in preview
+  const getPreviewContent = () => {
+    if (hasBeenEdited || !isHtmlContent(emailData.content)) {
+      return emailData.content;
+    }
+    return originalHtmlContent || emailData.content;
+  };
+
+  // Determine what content to show in textarea
+  const getEditableContent = () => {
+    if (isHtmlContent(emailData.content) && !hasBeenEdited) {
+      return stripHtml(emailData.content);
+    }
+    return emailData.content;
   };
 
   return (
@@ -318,29 +350,29 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
               <Label htmlFor="content" className="text-gray-300 flex items-center gap-2">
                 <Edit className="w-4 h-4" />
                 Email Content
-                {isHtmlContent(emailData.content) && (
+                {isHtmlContent(originalHtmlContent) && !hasBeenEdited && (
                   <span className="text-xs text-blue-400">(HTML email - editing will convert to plain text)</span>
                 )}
               </Label>
               <Textarea
                 id="content"
-                value={isHtmlContent(emailData.content) ? stripHtml(emailData.content) : emailData.content}
-                onChange={(e) => setEmailData({ ...emailData, content: e.target.value })}
+                value={getEditableContent()}
+                onChange={(e) => handleContentChange(e.target.value)}
                 className="bg-white/10 border-white/20 text-white min-h-[400px]"
                 placeholder="Enter email content..."
               />
             </div>
 
-            {/* HTML Preview for HTML emails */}
-            {isHtmlContent(emailData.content) && (
+            {/* HTML Preview for original HTML emails */}
+            {isHtmlContent(originalHtmlContent) && !hasBeenEdited && (
               <div>
                 <Label className="text-gray-300 flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  HTML Email Preview
+                  Original HTML Email Preview
                 </Label>
                 <div 
                   className="bg-white/5 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: emailData.content }}
+                  dangerouslySetInnerHTML={{ __html: getPreviewContent() }}
                 />
               </div>
             )}
@@ -348,8 +380,9 @@ P.S. Can't find a suitable time? Reply to this email, and we'll work around your
             {/* Preview Note */}
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
-                💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown here.
-                {isHtmlContent(emailData.content) && " This email contains HTML formatting - see preview above."}
+                💡 <strong>Tip:</strong> You can edit the subject and content above. The email will be sent exactly as shown.
+                {isHtmlContent(originalHtmlContent) && !hasBeenEdited && " This email contains HTML formatting - see preview above. Editing will convert to plain text."}
+                {hasBeenEdited && " Your edits will be sent as plain text."}
               </p>
             </div>
           </div>

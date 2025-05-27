@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -43,12 +44,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
   emailType,
 }) => {
   const [emailData, setEmailData] = useState<EmailData>({
-    subject: '',
-    content: '',
-    recipientEmail: '',
-    recipientName: '',
-  });
-  const [originalEmailData, setOriginalEmailData] = useState<EmailData>({
     subject: '',
     content: '',
     recipientEmail: '',
@@ -104,8 +99,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         recipientName: lead.name,
       };
 
-      // Store both original and current email data
-      setOriginalEmailData(generatedEmailData);
       setEmailData(generatedEmailData);
     } catch (error) {
       console.error('Error generating email draft:', error);
@@ -117,7 +110,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         recipientEmail: lead.email,
         recipientName: lead.name,
       };
-      setOriginalEmailData(fallbackEmailData);
       setEmailData(fallbackEmailData);
     } finally {
       setIsGenerating(false);
@@ -233,7 +225,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
     setIsSending(true);
     try {
-      // Always send the current email data (which includes any edits)
       await onSend(emailData);
       onClose();
     } catch (error) {
@@ -262,24 +253,14 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     return emailType ? titles[emailType] : 'Email Draft';
   };
 
-  // Function to strip HTML and show plain text
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
-  };
-
   // Function to detect if content is HTML
   const isHtmlContent = (content: string) => {
     return /<[a-z][\s\S]*>/i.test(content);
   };
 
-  // Always show HTML preview if original content was HTML, even after editing
-  const showHtmlPreview = isHtmlContent(originalEmailData.content);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-3">
             <Mail className="w-5 h-5" />
@@ -344,60 +325,63 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               />
             </div>
 
-            {/* Email Content */}
-            <div>
-              <Label htmlFor="content" className="text-gray-300 flex items-center gap-2">
-                <Edit className="w-4 h-4" />
-                Email Content
-                {hasBeenEdited && (
-                  <span className="text-xs text-yellow-400">(Edited - will be sent as plain text)</span>
-                )}
-              </Label>
-              <Textarea
-                id="content"
-                value={hasBeenEdited ? emailData.content : (isHtmlContent(emailData.content) ? stripHtml(emailData.content) : emailData.content)}
-                onChange={(e) => handleContentChange(e.target.value)}
-                className="bg-white/10 border-white/20 text-white min-h-[400px]"
-                placeholder="Enter email content..."
-              />
-            </div>
-
-            {/* HTML Preview - Always show if original content was HTML */}
-            {showHtmlPreview && (
+            {/* Single HTML Email Editor with Preview */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* HTML Editor */}
               <div>
-                <Label className="text-gray-300 flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  Original HTML Email Preview
+                <Label htmlFor="htmlContent" className="text-gray-300 flex items-center gap-2 mb-2">
+                  <Edit className="w-4 h-4" />
+                  HTML Email Content
                   {hasBeenEdited && (
-                    <span className="text-xs text-yellow-400">(Preview shows original - edited version will be plain text)</span>
+                    <span className="text-xs text-yellow-400">(Edited)</span>
                   )}
                 </Label>
-                <div 
-                  className="bg-white/5 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: originalEmailData.content }}
+                <Textarea
+                  id="htmlContent"
+                  value={emailData.content}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  className="bg-white/10 border-white/20 text-white min-h-[500px] font-mono text-sm"
+                  placeholder="Enter HTML email content..."
                 />
               </div>
-            )}
+
+              {/* Live Preview */}
+              <div>
+                <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                  <Mail className="w-4 h-4" />
+                  Live Email Preview
+                </Label>
+                <div className="bg-gray-900 border border-white/10 rounded-md min-h-[500px] overflow-y-auto">
+                  {isHtmlContent(emailData.content) ? (
+                    <div 
+                      className="p-4"
+                      dangerouslySetInnerHTML={{ __html: emailData.content }}
+                    />
+                  ) : (
+                    <div className="p-4 text-white whitespace-pre-wrap">
+                      {emailData.content}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Debug Information */}
             <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
               <p className="text-yellow-400 text-sm">
                 🔍 <strong>Debug Info:</strong><br />
-                Content to be sent: {hasBeenEdited ? 'Edited content (plain text)' : 'Original content'}<br />
                 Content Length: {emailData.content.length} characters<br />
                 Has been edited: {hasBeenEdited ? 'Yes' : 'No'}<br />
-                Original is HTML: {isHtmlContent(originalEmailData.content) ? 'Yes' : 'No'}<br />
+                Content is HTML: {isHtmlContent(emailData.content) ? 'Yes' : 'No'}<br />
                 Email Type: {emailType}
               </p>
             </div>
 
-            {/* Preview Note */}
+            {/* Usage Note */}
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
-                💡 <strong>Tip:</strong> You can edit the subject and content above. 
-                {!hasBeenEdited && isHtmlContent(originalEmailData.content) && " The original HTML formatting will be preserved when sent."}
-                {hasBeenEdited && " Your edits will be sent as plain text, but you can see the original HTML preview above."}
-                {!isHtmlContent(originalEmailData.content) && " This email will be sent as plain text."}
+                💡 <strong>Tip:</strong> Edit the HTML content on the left and see the live preview on the right. 
+                Both HTML and plain text content are supported. The exact content you see in the preview will be sent to the recipient.
               </p>
             </div>
           </div>

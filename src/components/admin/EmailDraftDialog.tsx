@@ -71,7 +71,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     setHasBeenEdited(false);
     
     try {
-      // Call the backend function to generate the email content
       const { data, error } = await supabase.functions.invoke('execute-lead-action', {
         body: {
           leadId: lead.id,
@@ -85,7 +84,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
       console.log('Generated email data:', data);
 
-      // Extract the content - all actions should return emailContent
       let content = '';
       if (data.emailContent) {
         content = data.emailContent;
@@ -104,12 +102,10 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         recipientName: lead.name,
       };
 
-      // Store both original and current email data
       setOriginalEmailData(generatedEmailData);
       setEmailData(generatedEmailData);
     } catch (error) {
       console.error('Error generating email draft:', error);
-      // Fallback to local generation if backend fails
       const draftData = generateLocalEmailContent(emailType, lead);
       const fallbackEmailData = {
         subject: draftData.subject,
@@ -240,7 +236,6 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         recipientEmail: emailData.recipientEmail
       });
 
-      // Always send the current email data (which includes any edits)
       await onSend(emailData);
       onClose();
     } catch (error) {
@@ -269,19 +264,16 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
     return emailType ? titles[emailType] : 'Email Draft';
   };
 
-  // Function to strip HTML and show plain text
   const stripHtml = (html: string) => {
     const tmp = document.createElement("div");
     tmp.innerHTML = html;
     return tmp.textContent || tmp.innerText || "";
   };
 
-  // Function to detect if content is HTML
   const isHtmlContent = (content: string) => {
     return /<[a-z][\s\S]*>/i.test(content);
   };
 
-  // Always show HTML preview if original content was HTML, even after editing
   const showHtmlPreview = isHtmlContent(originalEmailData.content);
 
   return (
@@ -369,19 +361,23 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               />
             </div>
 
-            {/* HTML Preview - Always show if original content was HTML */}
+            {/* HTML Preview - Always show with dark background */}
             {showHtmlPreview && (
               <div>
                 <Label className="text-gray-300 flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  Original HTML Email Preview
+                  Live HTML Email Preview
                   {hasBeenEdited && (
-                    <span className="text-xs text-yellow-400">(Preview shows original - edited version will be plain text)</span>
+                    <span className="text-xs text-yellow-400">(Shows content that will be sent)</span>
                   )}
                 </Label>
                 <div 
-                  className="bg-white/5 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: originalEmailData.content }}
+                  className="bg-gray-900 border border-white/10 rounded-md p-4 max-h-[300px] overflow-y-auto"
+                  dangerouslySetInnerHTML={{ 
+                    __html: hasBeenEdited ? 
+                      `<div style="color: white; font-family: Arial, sans-serif; white-space: pre-wrap;">${emailData.content}</div>` : 
+                      emailData.content 
+                  }}
                 />
               </div>
             )}
@@ -403,7 +399,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               <p className="text-blue-400 text-sm">
                 💡 <strong>Tip:</strong> You can edit the subject and content above. 
                 {!hasBeenEdited && isHtmlContent(originalEmailData.content) && " The original HTML formatting will be preserved when sent."}
-                {hasBeenEdited && " Your edits will be sent as plain text, but you can see the original HTML preview above."}
+                {hasBeenEdited && " Your edits will be sent as plain text, but you can see the live preview above."}
                 {!isHtmlContent(originalEmailData.content) && " This email will be sent as plain text."}
               </p>
             </div>

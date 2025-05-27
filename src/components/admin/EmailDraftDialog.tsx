@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -225,12 +224,38 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
     setIsSending(true);
     try {
-      await onSend(emailData);
+      // Send the exact email content from the dialog, don't regenerate
+      await sendEmailDirectly(emailData);
       onClose();
     } catch (error) {
       console.error('Error sending email:', error);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // New function to send email directly without regenerating content
+  const sendEmailDirectly = async (emailData: EmailData) => {
+    try {
+      console.log('🔧 Sending email with exact content from editor');
+      
+      // Call the backend with the exact email content and bypass regeneration
+      const { data, error } = await supabase.functions.invoke('send-email-direct', {
+        body: {
+          to: emailData.recipientEmail,
+          subject: emailData.subject,
+          htmlContent: emailData.content,
+          recipientName: emailData.recipientName
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Email sent successfully with editor content');
+      return data;
+    } catch (error) {
+      console.error('❌ Error sending direct email:', error);
+      throw error;
     }
   };
 
@@ -260,7 +285,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-xtech-dark-purple border border-white/10 text-white max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-3">
             <Mail className="w-5 h-5" />
@@ -325,7 +350,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
               />
             </div>
 
-            {/* Single HTML Email Editor with Preview */}
+            {/* Single Editable HTML Email Preview */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* HTML Editor */}
               <div>
@@ -381,7 +406,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
               <p className="text-blue-400 text-sm">
                 💡 <strong>Tip:</strong> Edit the HTML content on the left and see the live preview on the right. 
-                Both HTML and plain text content are supported. The exact content you see in the preview will be sent to the recipient.
+                The exact content you see in the preview will be sent to the recipient.
               </p>
             </div>
           </div>

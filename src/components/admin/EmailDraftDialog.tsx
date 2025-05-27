@@ -376,7 +376,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
                   <Mail className="w-4 h-4" />
                   Live Email Preview
                 </Label>
-                <div className="bg-xtech-dark border border-white/10 rounded-md min-h-[500px] overflow-y-auto">
+                <div className="bg-gray-800 border border-white/10 rounded-md min-h-[500px] overflow-y-auto">
                   {isHtmlContent(emailData.content) ? (
                     <div 
                       className="p-4"

@@ -141,22 +141,22 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         <div style="background: linear-gradient(135deg, #6c22d8, #00bcd4); padding: 30px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
           <h1 style="margin: 0; font-size: 28px;">Welcome to XTech Solutions!</h1>
         </div>
-        <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px; color: #333;">Hi ${leadData.name},</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">Thank you for your interest in XTech's IT services. We're excited to help optimize your technology infrastructure and drive your business forward.</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">Based on your inquiry about "<strong>${leadData.inquiry || 'IT services'}</strong>", our technical team will review your requirements and get back to you within 24 hours.</p>
+        <div style="background: #2a2a2a; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; color: #e0e0e0;">Hi ${leadData.name},</p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">Thank you for your interest in XTech's IT services. We're excited to help optimize your technology infrastructure and drive your business forward.</p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">Based on your inquiry about "<strong>${leadData.inquiry || 'IT services'}</strong>", our technical team will review your requirements and get back to you within 24 hours.</p>
           
-          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #6c22d8;">
+          <div style="background: #3a3a3a; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #6c22d8;">
             <h3 style="color: #6c22d8; margin-top: 0;">Next Steps:</h3>
-            <ul style="color: #333; line-height: 1.8;">
+            <ul style="color: #e0e0e0; line-height: 1.8;">
               <li>Our technical consultant will contact you shortly</li>
               <li>We'll schedule a brief consultation to understand your needs</li>
               <li>Receive a customized solution proposal</li>
             </ul>
           </div>
           
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">If you have any urgent questions, feel free to reply to this email or call us directly.</p>
-          <p style="font-size: 16px; color: #333;">Best regards,<br><strong>XTech Solutions Team</strong></p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">If you have any urgent questions, feel free to reply to this email or call us directly.</p>
+          <p style="font-size: 16px; color: #e0e0e0;">Best regards,<br><strong>XTech Solutions Team</strong></p>
         </div>
       </div>`
       },
@@ -166,14 +166,14 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         <div style="background: linear-gradient(135deg, #6c22d8, #00bcd4); padding: 30px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
           <h1 style="margin: 0; font-size: 28px;">Following Up on Your IT Needs</h1>
         </div>
-        <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px; color: #333;">Hi ${leadData.name},</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">I wanted to follow up on your recent inquiry about "${leadData.inquiry || 'IT services'}" and see how we can help move your project forward.</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">At XTech, we understand that choosing the right IT partner is crucial for your business success. That's why we'd like to offer you a complimentary consultation to discuss your specific needs.</p>
+        <div style="background: #2a2a2a; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; color: #e0e0e0;">Hi ${leadData.name},</p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">I wanted to follow up on your recent inquiry about "${leadData.inquiry || 'IT services'}" and see how we can help move your project forward.</p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">At XTech, we understand that choosing the right IT partner is crucial for your business success. That's why we'd like to offer you a complimentary consultation to discuss your specific needs.</p>
           
-          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">
+          <div style="background: #3a3a3a; padding: 20px; margin: 20px 0; border-radius: 8px;">
             <h3 style="color: #6c22d8; margin-top: 0;">How we can help:</h3>
-            <ul style="color: #333; line-height: 1.8;">
+            <ul style="color: #e0e0e0; line-height: 1.8;">
               <li>Assess your current IT infrastructure</li>
               <li>Identify optimization opportunities</li>
               <li>Provide cost-effective solutions</li>
@@ -181,8 +181,8 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             </ul>
           </div>
           
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">Would you be available for a brief 15-minute call this week? I'm happy to work around your schedule.</p>
-          <p style="font-size: 16px; color: #333;">Best regards,<br><strong>XTech Solutions Team</strong></p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">Would you be available for a brief 15-minute call this week? I'm happy to work around your schedule.</p>
+          <p style="font-size: 16px; color: #e0e0e0;">Best regards,<br><strong>XTech Solutions Team</strong></p>
         </div>
       </div>`
       },
@@ -192,17 +192,17 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
         <div style="background: linear-gradient(135deg, #6c22d8, #00bcd4); padding: 30px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
           <h1 style="margin: 0; font-size: 28px;">Your XTech Demo Awaits!</h1>
         </div>
-        <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px; color: #333;">Hi ${leadData.name},</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">We'd love to show you how XTech can transform your IT infrastructure with a personalized demo tailored to your needs.</p>
+        <div style="background: #2a2a2a; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; color: #e0e0e0;">Hi ${leadData.name},</p>
+          <p style="font-size: 16px; color: #e0e0e0; line-height: 1.6;">We'd love to show you how XTech can transform your IT infrastructure with a personalized demo tailored to your needs.</p>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="#" style="background: linear-gradient(135deg, #6c22d8, #00bcd4); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">Schedule Your Demo</a>
           </div>
           
-          <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">
+          <div style="background: #3a3a3a; padding: 20px; margin: 20px 0; border-radius: 8px;">
             <h3 style="color: #6c22d8; margin-top: 0;">What you'll see in your demo:</h3>
-            <ul style="color: #333; line-height: 1.8;">
+            <ul style="color: #e0e0e0; line-height: 1.8;">
               <li>Live demonstration of our solutions</li>
               <li>Customized recommendations for your business</li>
               <li>Q&A with our technical experts</li>
@@ -210,7 +210,7 @@ const EmailDraftDialog: React.FC<EmailDraftDialogProps> = ({
             </ul>
           </div>
           
-          <p style="font-size: 16px; color: #333;">Best regards,<br><strong>XTech Solutions Team</strong></p>
+          <p style="font-size: 16px; color: #e0e0e0;">Best regards,<br><strong>XTech Solutions Team</strong></p>
         </div>
       </div>`
       }

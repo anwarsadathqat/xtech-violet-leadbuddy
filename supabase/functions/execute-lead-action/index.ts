@@ -17,14 +17,7 @@ interface ActionRequest {
     inquiry?: string;
     source: string;
   };
-  previewOnly?: boolean;
-  // Add emailData for when sending actual emails with edited content
-  emailData?: {
-    subject: string;
-    content: string;
-    recipientEmail: string;
-    recipientName: string;
-  };
+  previewOnly?: boolean; // Add flag for preview mode
 }
 
 serve(async (req) => {
@@ -38,34 +31,33 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { leadId, action, leadData, previewOnly, emailData }: ActionRequest = await req.json();
+    const { leadId, action, leadData, previewOnly }: ActionRequest = await req.json();
     
     console.log(`🤖 LeadBuddy ${previewOnly ? 'previewing' : 'executing'} ${action} for lead ${leadData.name}`);
-    console.log(`📧 Email data provided:`, emailData ? 'Yes' : 'No');
 
     let result = { success: false, message: "" };
 
     switch (action) {
       case 'welcome_email':
       case 'send_welcome_email':
-        result = await sendWelcomeEmail(leadData, previewOnly, emailData);
+        result = await sendWelcomeEmail(leadData, previewOnly);
         break;
       case 'follow_up_email':
       case 'schedule_follow_up':
-        result = await scheduleFollowUp(leadData, supabase, previewOnly, emailData);
+        result = await scheduleFollowUp(leadData, supabase, previewOnly);
         break;
       case 'send_demo_link':
-        result = await sendDemoLink(leadData, previewOnly, emailData);
+        result = await sendDemoLink(leadData, previewOnly);
         break;
       case 'priority_alert':
       case 'priority_outreach':
-        result = await priorityOutreach(leadData, supabase, leadId, previewOnly, emailData);
+        result = await priorityOutreach(leadData, supabase, leadId, previewOnly);
         break;
       case 'demo_scheduler':
-        result = await scheduleDemoMeeting(leadData, supabase, previewOnly, emailData);
+        result = await scheduleDemoMeeting(leadData, supabase, previewOnly);
         break;
       case 're_engagement':
-        result = await reEngagementCampaign(leadData, previewOnly, emailData);
+        result = await reEngagementCampaign(leadData, previewOnly);
         break;
       default:
         result = { success: false, message: `Unknown action: ${action}` };
@@ -203,23 +195,12 @@ async function sendRealEmail(to: string, subject: string, htmlContent: string) {
   }
 }
 
-async function sendWelcomeEmail(leadData: any, previewOnly = false, emailData?: any) {
+async function sendWelcomeEmail(leadData: any, previewOnly = false) {
   try {
-    let emailContent, subject;
+    // Generate personalized email content using DeepSeek
+    const emailContent = await generateEmailContent(leadData, 'welcome');
     
-    // If emailData is provided (from edited content), use it
-    if (emailData && !previewOnly) {
-      console.log('📧 Using provided email content from dialog');
-      emailContent = emailData.content;
-      subject = emailData.subject;
-    } else {
-      // Generate new content for preview or when no email data provided
-      console.log('📧 Generating new email content via AI');
-      emailContent = await generateEmailContent(leadData, 'welcome');
-      subject = `Welcome to XTech Solutions, ${leadData.name}!`;
-    }
-    
-    console.log(`📧 Welcome email content prepared for ${leadData.email}`);
+    console.log(`📧 Welcome email content generated for ${leadData.email}`);
     console.log(`Email preview: ${emailContent.substring(0, 100)}...`);
     
     // If it's preview only, just return the content
@@ -231,10 +212,10 @@ async function sendWelcomeEmail(leadData: any, previewOnly = false, emailData?: 
       };
     }
     
-    // Send real email with the prepared content
+    // Send real email
     const emailResult = await sendRealEmail(
       leadData.email,
-      subject,
+      `Welcome to XTech Solutions, ${leadData.name}!`,
       emailContent
     );
     
@@ -257,21 +238,14 @@ async function sendWelcomeEmail(leadData: any, previewOnly = false, emailData?: 
   }
 }
 
-async function scheduleFollowUp(leadData: any, supabase: any, previewOnly = false, emailData?: any) {
+async function scheduleFollowUp(leadData: any, supabase: any, previewOnly = false) {
   try {
-    let emailContent, subject;
+    // Calculate optimal follow-up time (24-48 hours)
+    const followUpDate = new Date();
+    followUpDate.setHours(followUpDate.getHours() + 24);
     
-    // If emailData is provided (from edited content), use it
-    if (emailData && !previewOnly) {
-      console.log('📧 Using provided email content from dialog');
-      emailContent = emailData.content;
-      subject = emailData.subject;
-    } else {
-      // Generate new content for preview or when no email data provided
-      console.log('📧 Generating new email content via AI');
-      emailContent = await generateEmailContent(leadData, 'follow_up');
-      subject = `Following up on your XTech inquiry, ${leadData.name}`;
-    }
+    // Generate follow-up email content
+    const emailContent = await generateEmailContent(leadData, 'follow_up');
     
     // If it's preview only, just return the content
     if (previewOnly) {
@@ -285,15 +259,15 @@ async function scheduleFollowUp(leadData: any, supabase: any, previewOnly = fals
     // Send real follow-up email
     const emailResult = await sendRealEmail(
       leadData.email,
-      subject,
+      `Following up on your XTech inquiry, ${leadData.name}`,
       emailContent
     );
     
     if (emailResult.success) {
-      console.log(`📅 Follow-up email sent to ${leadData.name}`);
+      console.log(`📅 Follow-up email sent to ${leadData.name} at ${followUpDate.toISOString()}`);
       return { 
         success: true, 
-        message: `✅ Follow-up email sent to ${leadData.name}`,
+        message: `✅ Follow-up email sent to ${leadData.name}. Next contact scheduled for ${followUpDate.toLocaleDateString()}`,
         emailContent,
         messageId: emailResult.messageId
       };
@@ -308,23 +282,11 @@ async function scheduleFollowUp(leadData: any, supabase: any, previewOnly = fals
   }
 }
 
-async function sendDemoLink(leadData: any, previewOnly = false, emailData?: any) {
+async function sendDemoLink(leadData: any, previewOnly = false) {
   try {
-    let emailContent, subject;
+    const emailContent = await generateEmailContent(leadData, 'demo');
     
-    // If emailData is provided (from edited content), use it
-    if (emailData && !previewOnly) {
-      console.log('📧 Using provided email content from dialog');
-      emailContent = emailData.content;
-      subject = emailData.subject;
-    } else {
-      // Generate new content for preview or when no email data provided
-      console.log('📧 Generating new email content via AI');
-      emailContent = await generateEmailContent(leadData, 'demo');
-      subject = `Your XTech Demo is Ready, ${leadData.name}!`;
-    }
-    
-    console.log(`🎥 Demo link email prepared for ${leadData.email}`);
+    console.log(`🎥 Demo link email generated for ${leadData.email}`);
     
     // If it's preview only, just return the content
     if (previewOnly) {
@@ -338,7 +300,7 @@ async function sendDemoLink(leadData: any, previewOnly = false, emailData?: any)
     // Send real demo email
     const emailResult = await sendRealEmail(
       leadData.email,
-      subject,
+      `Your XTech Demo is Ready, ${leadData.name}!`,
       emailContent
     );
     
@@ -360,21 +322,10 @@ async function sendDemoLink(leadData: any, previewOnly = false, emailData?: any)
   }
 }
 
-async function priorityOutreach(leadData: any, supabase: any, leadId: string, previewOnly = false, emailData?: any) {
+async function priorityOutreach(leadData: any, supabase: any, leadId: string, previewOnly = false) {
   try {
-    let emailContent, subject;
-    
-    // If emailData is provided (from edited content), use it
-    if (emailData && !previewOnly) {
-      console.log('📧 Using provided email content from dialog');
-      emailContent = emailData.content;
-      subject = emailData.subject;
-    } else {
-      // Generate new content for preview or when no email data provided
-      console.log('📧 Generating new email content via AI');
-      emailContent = await generateEmailContent(leadData, 'priority_outreach');
-      subject = `Priority Response: Your XTech Consultation, ${leadData.name}`;
-    }
+    // Generate priority outreach email
+    const emailContent = await generateEmailContent(leadData, 'priority_outreach');
     
     // If it's preview only, just return the content
     if (previewOnly) {
@@ -395,7 +346,7 @@ async function priorityOutreach(leadData: any, supabase: any, leadId: string, pr
     // Send real priority email
     const emailResult = await sendRealEmail(
       leadData.email,
-      subject,
+      `Priority Response: Your XTech Consultation, ${leadData.name}`,
       emailContent
     );
     
@@ -418,21 +369,9 @@ async function priorityOutreach(leadData: any, supabase: any, leadId: string, pr
   }
 }
 
-async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = false, emailData?: any) {
+async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = false) {
   try {
-    let emailContent, subject;
-    
-    // If emailData is provided (from edited content), use it
-    if (emailData && !previewOnly) {
-      console.log('📧 Using provided email content from dialog');
-      emailContent = emailData.content;
-      subject = emailData.subject;
-    } else {
-      // Generate new content for preview or when no email data provided
-      console.log('📧 Generating new email content via AI');
-      emailContent = await generateEmailContent(leadData, 'demo_meeting');
-      subject = `Demo Meeting Scheduled: ${leadData.name}`;
-    }
+    const emailContent = await generateEmailContent(leadData, 'demo_meeting');
     
     // If it's preview only, just return the content
     if (previewOnly) {
@@ -446,7 +385,7 @@ async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = f
     // Send real demo meeting email
     const emailResult = await sendRealEmail(
       leadData.email,
-      subject,
+      `Demo Meeting Scheduled: ${leadData.name}`,
       emailContent
     );
     
@@ -469,21 +408,9 @@ async function scheduleDemoMeeting(leadData: any, supabase: any, previewOnly = f
   }
 }
 
-async function reEngagementCampaign(leadData: any, previewOnly = false, emailData?: any) {
+async function reEngagementCampaign(leadData: any, previewOnly = false) {
   try {
-    let emailContent, subject;
-    
-    // If emailData is provided (from edited content), use it
-    if (emailData && !previewOnly) {
-      console.log('📧 Using provided email content from dialog');
-      emailContent = emailData.content;
-      subject = emailData.subject;
-    } else {
-      // Generate new content for preview or when no email data provided
-      console.log('📧 Generating new email content via AI');
-      emailContent = await generateEmailContent(leadData, 're_engagement');
-      subject = `We miss you! ${leadData.name}, let's reconnect`;
-    }
+    const emailContent = await generateEmailContent(leadData, 're_engagement');
     
     // If it's preview only, just return the content
     if (previewOnly) {
@@ -497,7 +424,7 @@ async function reEngagementCampaign(leadData: any, previewOnly = false, emailDat
     // Send real re-engagement email
     const emailResult = await sendRealEmail(
       leadData.email,
-      subject,
+      `We miss you! ${leadData.name}, let's reconnect`,
       emailContent
     );
     
